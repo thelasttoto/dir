@@ -3,17 +3,18 @@
 The Agent Directory (dir) allows publication and exchange of information about AI
 agents via standard data models on a distributed peer-to-peer network. 
 It provides standard interfaces to perform publication, discovery based on queries about agent's
-attributes and constraints, and storage for the data models with basic security features such as
-provenance and ownership.
+attributes and constraints, and storage for the data models with security features such as
+provenance, integrity and ownership.
 
 ## Features
 
-- _Standards_ - Defines standard models for AI agent data representation.
-- _Extensions_ - Supports model and build extensions to enrich models with usage-specific data.
-- _Announce_ - Enables publication of new agents on the network.
-- _Discover_ - Allows listening for the publication of new agents on the network.
-- _Search_ - Supports searching of agents across the network that satisfy given attributes and constraints.
-- _Security_ - Employs common standards to provide data provenance and ownership.
+- _Standards_ - Defines standard schema for data representation and exchange.
+- _Dev Kit_ - Tooling to facilitate API interaction and generation of agent data models from different sources.
+- _Extensions_ - Supports model schema and build extensions to enrich agent data models for custom use-cases.
+- _Announce_ - Enables publication of records to the network.
+- _Discover_ - Listen and retreive records published on the network.
+- _Search_ - Supports searching of records across the network that satisfy given attributes and constraints.
+- _Security_ - Relies on well-known security principles to provide data provenance, integrity and ownership.
 
 **NOTE**: This is an alpha version, some features may be missing and breaking changes are expected.
 
@@ -38,7 +39,7 @@ Main software components:
 
 ### Golang Packages
 
-See https://pkg.go.dev/agntcy/dir
+See https://pkg.go.dev/github.com/agntcy/dir
 
 ### Binaries
 
