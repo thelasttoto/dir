@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 Cisco and/or its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
+module-sets:
+  agent-directory:
+    version: v0.1.0
+    modules:
+      - github.com/agntcy/dir/api
+      - github.com/agntcy/dir/cli
+      - github.com/agntcy/dir/client
+      - github.com/agntcy/dir/server
+
+excluded-modules:
+  - github.com/agntcy/dir/e2e
