@@ -39,7 +39,7 @@ Main software components:
 
 ### Golang Packages
 
-See https://pkg.go.dev/github.com/agntcy/dir
+See [API package](https://pkg.go.dev/github.com/agntcy/dir/api), [Server package](https://pkg.go.dev/github.com/agntcy/dir/server) and [CLI package](https://pkg.go.dev/github.com/agntcy/dir/cli).
 
 ### Binaries
 
@@ -48,8 +48,8 @@ See https://github.com/agntcy/dir/releases
 ### Container images
 
 ```bash
-docker pull ghcr.io/agntcy/dir/dir-ctl:latest
-docker pull ghcr.io/agntcy/dir/dir-apiserver:latest
+docker pull ghcr.io/agntcy/dir-ctl:latest
+docker pull ghcr.io/agntcy/dir-apiserver:latest
 ```
 
 ### Helm charts
@@ -69,6 +69,90 @@ task gen
 task build
 task test:e2e
 ```
+
+## Deployment
+
+To deploy the Directory, you can use the provided `Taskfile` commands to start the necessary services and deploy the Directory server. Alternatively, you can deploy from a GitHub Helm chart release.
+
+### Local Deployment
+
+To start a local OCI registry server for storage and the Directory server, use the following commands:
+
+```bash
+task server:store:start
+task server:start
+```
+
+These commands will set up a local environment for development and testing purposes.
+
+### Remote Deployment
+
+To deploy the Directory into an existing Kubernetes cluster, use a released Helm chart from GitHub with the following commands:
+
+```bash
+helm pull oci://ghcr.io/agntcy/dir/helm-charts/dir --version latest
+helm upgrade --install dir oci://ghcr.io/agntcy/dir/helm-charts/dir --version latest
+```
+
+These commands will pull the latest version of the Directory Helm chart from the GitHub Container Registry and install or upgrade the Directory in your Kubernetes cluster. Ensure that your Kubernetes cluster is properly configured and accessible before running these commands. The `helm upgrade --install` command will either upgrade an existing release or install a new release if it does not exist.
+
+## Usage
+
+The Directory CLI provides `build`, `push`, and `pull` commands to interact with the Directory server. Below are the details on how to run each command.
+
+To run these commands, you can either:
+* Download a released CLI binary with `curl -L -o dirctl https://github.com/agntcy/dir/releases/download/<release tag>/dirctl-$(uname | tr '[:upper:]' '[:lower:]')-$(uname -m)`
+* Use a binary compiled from source with `task cli:compile`
+* Use CLI module from source by navigating to the `cli` directory and running `go run cli.go <command> <args>`
+
+### Build Command
+
+The `build` command is used to compile and build the agent data model.
+
+Usage:
+```bash
+dirctl build [options] <path-to-agent>
+```
+
+Options:
+- `--name` : Name of the agent.
+- `--version` : Version of the agent.
+- `--artifact-url` : URL of the agent artifact.
+- `--artifact-type` : Type of the agent artifact.
+- `--author` : Authors to set for the agent. Overrides builder defaults. Example usage: `--author author1 --author author2`.
+- `--category` : Categories to set for the agent. Overrides builder defaults. Example usage: `--category category1 --category category2`.
+- `--created-at` : Agent creation time in RFC3339 format.
+- `--llmanalyzer` : Enable LLMAnalyzer extension.
+
+### Push Command
+
+The `push` command is used to publish the built agent data model to the store. The input data model should be JSON formatted.
+
+Usage:
+```bash
+dirctl push [options]
+```
+
+Options:
+- `--from-file` : Read compiled data from JSON file, reads from STDIN if empty.
+- `--server-addr`: Directory Server API address (default "0.0.0.0:8888")
+
+Example usage with read from STDIN: `dirctl build <args> | dirctl push`.
+
+### Pull Command
+
+The `pull` command is used to retrieve agent data model from the store. The output data model will be JSON formatted.
+
+Usage:
+```bash
+dirctl pull [options]
+```
+
+Options:
+- `--digest` : Digest of the agent to pull.
+- `--server-addr`: Directory Server API address (default "0.0.0.0:8888")
+
+Example usage in combination with other commands: `dirctl pull --digest $(dirctl build | dirctl push)`.
 
 ## Copyright Notice
 
