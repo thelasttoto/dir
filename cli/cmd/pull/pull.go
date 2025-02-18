@@ -19,8 +19,8 @@ var Command = &cobra.Command{
 	Short: "Pull compiled agent model from Directory",
 	Long: `Usage example:
 
-	# Pull by digest
-	dirctl pull --digest sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+	# Pull by digest and output in JSON format
+	dirctl pull --digest <digest-string> --json
 
 	# Pull in combination with other commands
 	dirctl pull --digest $(dirctl build | dirctl push)
@@ -56,18 +56,23 @@ func runCommand(cmd *cobra.Command) error {
 	}
 
 	// Unmarshal the data into an Agent struct for validation only
-	{
-		var agent coretypes.Agent
-		if err := json.Unmarshal(agentRaw, &agent); err != nil {
-			return fmt.Errorf("failed to unmarshal agent: %w", err)
-		}
+	var agent coretypes.Agent
+	if err := json.Unmarshal(agentRaw, &agent); err != nil {
+		return fmt.Errorf("failed to unmarshal agent: %w", err)
 	}
 
-	// Print to output
-	_, err = fmt.Fprint(cmd.OutOrStdout(), string(agentRaw))
-	if err != nil {
-		return fmt.Errorf("failed to print built data: %w", err)
+	// If JSON flag is set, marshal the agent to JSON and print it
+	if opts.JSON {
+		output, err := json.MarshalIndent(&agent, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal agent to JSON: %w", err)
+		}
+		cmd.Print(string(output))
+		return nil
 	}
+
+	// Print the raw agent data
+	cmd.Print(string(agentRaw))
 
 	return nil
 }
