@@ -104,8 +104,6 @@ jobs:
         run: |
           echo "🚧 Pushing ${{ steps.build.outputs.package }} to GHCR OCI registry"
           helm push ${{ steps.build.outputs.package }} oci://${{ inputs.image_repo }}/dir/helm-charts
-          echo "🚧 Pushing ${{ steps.build.outputs.latest_package }} to GHCR OCI registry"
-          helm push ${{ steps.build.outputs.latest_package }} oci://${{ inputs.image_repo }}/dir/helm-charts
 
   cli:
     name: CLI
