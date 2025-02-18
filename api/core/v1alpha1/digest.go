@@ -4,8 +4,8 @@
 package corev1alpha1
 
 import (
-	"encoding/hex"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -21,28 +21,38 @@ func init() {
 	}
 }
 
-func (d *Digest) ToString() string {
-	return fmt.Sprintf("%s:%x", DigestType_name[int32(d.GetType())], d.GetValue())
+func (d *Digest) Encode() string {
+	return fmt.Sprintf("%s:%s", DigestType_name[int32(d.GetType())], d.GetValue())
 }
 
-func (d *Digest) FromString(str string) error {
+func (d *Digest) Decode(str string) error {
 	// parse and validate digest
 	parts := strings.Split(str, ":")
 	if len(parts) != 2 {
 		return fmt.Errorf("digest parts not found")
 	}
 
-	// extract signature
-	digestValue, err := hex.DecodeString(parts[1])
-	if err != nil {
-		return fmt.Errorf("failed to decode digest: %w", err)
+	// validate digest
+	digestType := DigestType(DigestType_value[parts[0]])
+	if digestType == DigestType_DIGEST_TYPE_SHA256 && !isValidSHA256(parts[1]) {
+		return fmt.Errorf("invalid SHA-256 hash")
 	}
 
 	// update digest
 	*d = Digest{
-		Type:  DigestType(DigestType_value[parts[0]]),
-		Value: digestValue,
+		Type:  digestType,
+		Value: parts[1],
 	}
 
 	return nil
+}
+
+// isValidSHA256 checks if a string is a valid SHA-256 hash
+func isValidSHA256(s string) bool {
+	// SHA-256 hash is a 64-character hexadecimal string
+	matched, err := regexp.MatchString("^[a-fA-F0-9]{64}$", s)
+	if err != nil {
+		return false
+	}
+	return matched
 }

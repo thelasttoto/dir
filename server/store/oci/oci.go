@@ -6,7 +6,6 @@ package oci
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -54,7 +53,12 @@ func New(config Config) (types.StoreService, error) {
 }
 
 func (s *store) Lookup(ctx context.Context, digest *coretypes.Digest) (*coretypes.ObjectMeta, error) {
-	_, metaReader, err := s.repository.Blobs().FetchReference(ctx, ocidigest.NewDigestFromBytes(ocidigest.SHA256, digest.Value).String())
+	ociDigest, err := convertToOciDigest(digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert digest: %w", err)
+	}
+
+	_, metaReader, err := s.repository.Blobs().FetchReference(ctx, ociDigest.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch object: %w", err)
 	}
@@ -90,16 +94,10 @@ func (s *store) Push(ctx context.Context, meta *coretypes.ObjectMeta, contents i
 		return &coretypes.Digest{}, fmt.Errorf("failed to push object: %w", err)
 	}
 
-	// extract signature
-	digestValue, err := hex.DecodeString(desc.Digest.Encoded())
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode digest: %w", err)
-	}
-
 	// Create metadata
 	meta.Digest = &coretypes.Digest{
 		Type:  coretypes.DigestType_DIGEST_TYPE_SHA256,
-		Value: digestValue,
+		Value: desc.Digest.Encoded(),
 	}
 	metaBytes, err := json.Marshal(meta)
 	if err != nil {
@@ -113,15 +111,9 @@ func (s *store) Push(ctx context.Context, meta *coretypes.ObjectMeta, contents i
 		return &coretypes.Digest{}, fmt.Errorf("failed to push object: %w", err)
 	}
 
-	// extract signature
-	digestValue, err = hex.DecodeString(metaDesc.Digest.Encoded())
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode digest: %w", err)
-	}
-
 	return &coretypes.Digest{
 		Type:  coretypes.DigestType_DIGEST_TYPE_SHA256,
-		Value: digestValue,
+		Value: metaDesc.Digest.Encoded(),
 	}, nil
 }
 
@@ -131,7 +123,12 @@ func (s *store) Pull(ctx context.Context, digest *coretypes.Digest) (io.Reader, 
 		return nil, fmt.Errorf("failed to lookup object: %w", err)
 	}
 
-	_, reader, err := s.repository.Blobs().FetchReference(ctx, ocidigest.NewDigestFromBytes(ocidigest.SHA256, meta.Digest.Value).String())
+	metaOciDigest, err := convertToOciDigest(meta.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert digest: %w", err)
+	}
+
+	_, reader, err := s.repository.Blobs().FetchReference(ctx, metaOciDigest.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch object: %w", err)
 	}
@@ -145,8 +142,13 @@ func (s *store) Delete(ctx context.Context, digest *coretypes.Digest) error {
 		return fmt.Errorf("failed to lookup object: %w", err)
 	}
 
+	ociDigest, err := convertToOciDigest(digest)
+	if err != nil {
+		return fmt.Errorf("failed to convert digest: %w", err)
+	}
+
 	// Delete the metadata
-	metaDescriptor, err := s.repository.Blobs().Resolve(ctx, ocidigest.NewDigestFromBytes(ocidigest.SHA256, digest.Value).String())
+	metaDescriptor, err := s.repository.Blobs().Resolve(ctx, ociDigest.String())
 	if err != nil {
 		return fmt.Errorf("failed to resolve object: %w", err)
 	}
@@ -154,8 +156,13 @@ func (s *store) Delete(ctx context.Context, digest *coretypes.Digest) error {
 		return fmt.Errorf("failed to delete object: %w", err)
 	}
 
+	metaOciDigest, err := convertToOciDigest(meta.Digest)
+	if err != nil {
+		return fmt.Errorf("failed to convert digest: %w", err)
+	}
+
 	// Delete the blob
-	objectDescriptor, err := s.repository.Blobs().Resolve(ctx, ocidigest.NewDigestFromBytes(ocidigest.SHA256, meta.Digest.Value).String())
+	objectDescriptor, err := s.repository.Blobs().Resolve(ctx, metaOciDigest.String())
 	if err != nil {
 		return fmt.Errorf("failed to resolve object: %w", err)
 	}
@@ -164,4 +171,13 @@ func (s *store) Delete(ctx context.Context, digest *coretypes.Digest) error {
 	}
 
 	return nil
+}
+
+// convertToOciDigest converts a coretypes.Digest to an ocidigest.Digest
+func convertToOciDigest(digest *coretypes.Digest) (*ocidigest.Digest, error) {
+	if digest.Type == coretypes.DigestType_DIGEST_TYPE_SHA256 {
+		d := ocidigest.NewDigestFromEncoded("sha256", digest.Value)
+		return &d, nil
+	}
+	return nil, fmt.Errorf("unsupported digest type: %v", digest.Type)
 }
