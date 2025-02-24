@@ -12,27 +12,43 @@ import (
 	"github.com/agntcy/dir/cli/builder/extensions/llmanalyzer"
 	"github.com/agntcy/dir/cli/builder/extensions/runtime"
 	"github.com/agntcy/dir/cli/builder/manager"
+	"github.com/agntcy/dir/cli/cmd/build/config"
+	"github.com/agntcy/dir/cli/types"
 )
 
-func Build(ctx context.Context, fsPath string, agent *apicore.Agent, categories []string, LLMAnalyzer bool) error {
+func Build(ctx context.Context, cfg *config.Config) ([]*apicore.Extension, error) {
 	extManager := manager.NewExtensionManager()
 
 	// Register extensions
-	extManager.Register(runtime.ExtensionName, fsPath)
-	extManager.Register(category.ExtensionName, categories)
-	extManager.Register(crewai.ExtensionName, fsPath)
+	extManager.Register(runtime.ExtensionName, cfg.Source)
+	extManager.Register(category.ExtensionName, cfg.Categories)
+	extManager.Register(crewai.ExtensionName, cfg.Source)
 
-	if LLMAnalyzer {
-		extManager.Register(llmanalyzer.ExtensionName, fsPath)
+	if cfg.LLMAnalyzer {
+		extManager.Register(llmanalyzer.ExtensionName, cfg.Source)
 	}
 
 	// Build and append extensions to agent
 	extensions, err := extManager.Build(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	agent.Extensions = append(agent.Extensions, extensions...)
+	// Append config extensions
+	for _, ext := range cfg.Extensions {
+		extension := types.AgentExtension{
+			Name:    ext.Name,
+			Version: ext.Version,
+			Specs:   ext.Specs,
+		}
 
-	return nil
+		apiExt, err := extension.ToAPIExtension()
+		if err != nil {
+			return nil, err
+		}
+
+		extensions = append(extensions, &apiExt)
+	}
+
+	return extensions, nil
 }
