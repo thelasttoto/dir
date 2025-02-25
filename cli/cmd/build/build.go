@@ -6,12 +6,14 @@ package build
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	apicore "github.com/agntcy/dir/api/core/v1alpha1"
 	"github.com/agntcy/dir/cli/builder"
 	"github.com/agntcy/dir/cli/cmd/build/config"
+	"github.com/agntcy/dir/cli/types"
 	"github.com/spf13/cobra"
 )
 
@@ -23,12 +25,10 @@ var Command = &cobra.Command{
 	dirctl build \
 		--name="agent-name" \
 		--version="v1.0.0" \
-		--artifact="docker-image:http://ghcr.io/example/example" \
-		--artifact="python-package:http://ghcr.io/example/example" \
+		--locator="docker-image:http://ghcr.io/example/example" \
+		--locator="python-package:http://ghcr.io/example/example" \
 		--author="author1" \
 		--author="author2" \
-		--category="category1" \
-		--category="category2" \
 		./path-to-agent
 
 `,
@@ -43,10 +43,13 @@ var Command = &cobra.Command{
 func runCommand(cmd *cobra.Command, agentPath string) error {
 	// Get configuration from flags
 	buildConfig := &config.Config{}
-	err := buildConfig.LoadFromFlags(opts.Name, opts.Version, opts.CreatedAt, opts.LLMAnalyzer, opts.Authors, opts.Categories, opts.Artifacts)
+	err := buildConfig.LoadFromFlags(opts.Name, opts.Version, opts.LLMAnalyzer, opts.Authors, opts.Locators)
 	if err != nil {
 		return fmt.Errorf("failed to load config from flags: %w", err)
 	}
+
+	// Set source to agent path
+	buildConfig.Builder.Source = agentPath
 
 	// Get configuration from file
 	if opts.ConfigFile != "" {
@@ -61,18 +64,31 @@ func runCommand(cmd *cobra.Command, agentPath string) error {
 		buildConfig.Merge(fileConfig)
 	}
 
-	// Set source to agent path
-	buildConfig.Source = agentPath
-
 	locators, err := buildConfig.GetAPILocators()
 	if err != nil {
 		return fmt.Errorf("failed to get locators from config: %w", err)
 	}
 
 	// Build to obtain agent model
-	extensions, err := builder.Build(cmd.Context(), buildConfig)
+	extensions, err := builder.Build(cmd.Context(), &buildConfig.Builder)
 	if err != nil {
 		return fmt.Errorf("failed to build agent: %w", err)
+	}
+
+	// Append config extensions
+	for _, ext := range buildConfig.Extensions {
+		extension := types.AgentExtension{
+			Name:    ext.Name,
+			Version: ext.Version,
+			Specs:   ext.Specs,
+		}
+
+		apiExt, err := extension.ToAPIExtension()
+		if err != nil {
+			return fmt.Errorf("failed to convert extension to API extension: %w", err)
+		}
+
+		extensions = append(extensions, &apiExt)
 	}
 
 	// Create agent data model
@@ -80,7 +96,7 @@ func runCommand(cmd *cobra.Command, agentPath string) error {
 		Name:       buildConfig.Name,
 		Version:    buildConfig.Version,
 		Authors:    buildConfig.Authors,
-		CreatedAt:  timestamppb.New(buildConfig.CreatedAt),
+		CreatedAt:  timestamppb.New(time.Now()),
 		Locators:   locators,
 		Extensions: extensions,
 	}

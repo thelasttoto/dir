@@ -5,14 +5,14 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v2"
 
 	apicore "github.com/agntcy/dir/api/core/v1alpha1"
+	builderconfig "github.com/agntcy/dir/cli/builder/config"
 )
 
-type Artifact struct {
+type Locator struct {
 	Type string `yaml:"type"`
 	URL  string `yaml:"url"`
 }
@@ -24,49 +24,37 @@ type Extension struct {
 }
 
 type Config struct {
-	Source      string      `yaml:"source"`
-	Name        string      `yaml:"name"`
-	Version     string      `yaml:"version"`
-	CreatedAt   time.Time   `yaml:"created_at"`
-	LLMAnalyzer bool        `yaml:"llmanalyzer"`
-	Authors     []string    `yaml:"authors"`
-	Categories  []string    `yaml:"categories"`
-	Artifacts   []Artifact  `yaml:"artifacts"`
-	Extensions  []Extension `yaml:"extensions"`
+	Name       string      `yaml:"name"`
+	Version    string      `yaml:"version"`
+	Authors    []string    `yaml:"authors"`
+	Locators   []Locator   `yaml:"locators"`
+	Extensions []Extension `yaml:"extensions"`
+
+	Builder builderconfig.Config `yaml:"builder"`
 }
 
-func (c *Config) LoadFromFlags(name, version, createdAt string, llmAnalyzer bool, authors, categories []string, rawArtifacts []string) error {
+func (c *Config) LoadFromFlags(name, version string, llmAnalyzer bool, authors, rawLocators []string) error {
 	c.Name = name
 	c.Version = version
-	c.LLMAnalyzer = llmAnalyzer
 	c.Authors = authors
-	c.Categories = categories
 
-	// Override creation time if requested
-	c.CreatedAt = time.Now()
-	if createdAt != "" {
-		var err error
-		c.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-		if err != nil {
-			return fmt.Errorf("failed to parse create time: %w", err)
-		}
-	}
+	c.Builder.LLMAnalyzer = llmAnalyzer
 
-	// Load in artifacts
-	var artifacts []Artifact
-	for _, artifact := range rawArtifacts {
-		// Split artifact into type and URL
-		parts := strings.SplitN(artifact, ":", 2)
+	// Load in locators
+	var locators []Locator
+	for _, locator := range rawLocators {
+		// Split locator into type and URL
+		parts := strings.SplitN(locator, ":", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid artifact format, expected 'type:url'")
+			return fmt.Errorf("invalid locator format, expected 'type:url'")
 		}
 
-		artifacts = append(artifacts, Artifact{
+		locators = append(locators, Locator{
 			Type: parts[0],
 			URL:  parts[1],
 		})
 	}
-	c.Artifacts = artifacts
+	c.Locators = locators
 
 	// TODO Allow for extensions to be passed in via flags?
 
@@ -94,7 +82,7 @@ func (c *Config) LoadFromFile(path string) error {
 
 func (c *Config) GetAPILocators() ([]*apicore.Locator, error) {
 	var locators []*apicore.Locator
-	for _, locator := range c.Artifacts {
+	for _, locator := range c.Locators {
 		var ok bool
 		var locatorType int32
 		if locatorType, ok = apicore.LocatorType_value[locator.Type]; !ok {
@@ -115,12 +103,14 @@ func (c *Config) GetAPILocators() ([]*apicore.Locator, error) {
 func (c *Config) Merge(extra *Config) {
 	c.Name = firstNonEmpty(c.Name, extra.Name)
 	c.Version = firstNonEmpty(c.Version, extra.Version)
-	// c.LLMAnalyzer = c.LLMAnalyzer
+	// c.Builder.LLMAnalyzer = c.Builder.LLMAnalyzer
 	// TODO check if slice fields should be merged or replaced
 	c.Authors = firstNonEmptySlice(c.Authors, extra.Authors)
-	c.Categories = firstNonEmptySlice(c.Categories, extra.Categories)
-	c.Artifacts = firstNonEmptySlice(c.Artifacts, extra.Artifacts)
+	c.Locators = firstNonEmptySlice(c.Locators, extra.Locators)
 	c.Extensions = firstNonEmptySlice(c.Extensions, extra.Extensions)
+
+	c.Builder.Source = firstNonEmpty(c.Builder.Source, extra.Builder.Source)
+	c.Builder.SourceIgnore = firstNonEmptySlice(c.Builder.SourceIgnore, extra.Builder.SourceIgnore)
 }
 
 func firstNonEmpty(opt, cfg string) string {

@@ -4,21 +4,13 @@ name: "agent-name"
 # The version of the agent
 version: "v1.0.0"
 
-# Enable or disable the LLM analyzer extension
-llmanalyzer: false
-
 # List of authors of the agent
 authors:
   - "author1"
   - "author2"
 
-# List of categories of the agent
-categories:
-  - "category1"
-  - "category2"
-
-# List of artifacts of the agent
-artifacts:
+# List of locators of the agent
+locators:
   - type: "docker-image"
     url: "url1"
   - type: "binary"
@@ -37,3 +29,18 @@ extensions:
     specs:
       license: "Apache-2.0"
       header: "Copyright (c) 2025 Cisco and/or its affiliates."
+  - name: "category"
+    version: "v1.0.0"
+    specs:
+      categories: ["category1", "category2"]
+
+builder:
+  # Source code of the agent
+  source: "path/to/source"
+
+  # List of paths to ignore
+  source-ignore:
+    - ".venv/"
+
+  # Enable or disable the LLM analyzer extension
+  llmanalyzer: false
