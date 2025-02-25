@@ -6,6 +6,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	"github.com/agntcy/dir/cli/cmd/build"
 	"github.com/agntcy/dir/cli/cmd/pull"
 	"github.com/agntcy/dir/cli/cmd/push"
@@ -51,6 +52,5 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(RootCmd.OutOrStdout(), "\n")
 	return nil
 }
