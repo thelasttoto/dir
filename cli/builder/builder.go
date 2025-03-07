@@ -5,34 +5,80 @@ package builder
 
 import (
 	"context"
+	"fmt"
 
 	apicore "github.com/agntcy/dir/api/core/v1alpha1"
 	"github.com/agntcy/dir/cli/builder/config"
-	"github.com/agntcy/dir/cli/builder/extensions/crewai"
-	"github.com/agntcy/dir/cli/builder/extensions/llmanalyzer"
-	"github.com/agntcy/dir/cli/builder/extensions/runtime"
-	"github.com/agntcy/dir/cli/builder/manager"
+	"github.com/agntcy/dir/cli/builder/plugins/crewai"
+	"github.com/agntcy/dir/cli/builder/plugins/llmanalyzer"
+	"github.com/agntcy/dir/cli/builder/plugins/runtime"
+	"github.com/agntcy/dir/cli/types"
+	clitypes "github.com/agntcy/dir/cli/types"
 )
 
-func Build(ctx context.Context, cfg *config.Config) ([]*apicore.Extension, error) {
-	extManager := manager.NewExtensionManager()
+type Builder struct {
+	extensions []clitypes.ExtensionBuilder
+	cfg        *config.Config
+}
 
-	// Register extensions
-	extManager.Register(runtime.ExtensionName, cfg.Source)
+func NewBuilder(cfg *config.Config) *Builder {
+	return &Builder{
+		extensions: make([]clitypes.ExtensionBuilder, 0),
+		cfg:        cfg,
+	}
+}
 
-	if cfg.CrewAI {
-		extManager.Register(crewai.ExtensionName, cfg)
+func (em *Builder) RegisterExtensions() error {
+	if em.cfg.Builder.CrewAI {
+		em.extensions = append(em.extensions, crewai.New(em.cfg.Builder.Source, em.cfg.Builder.SourceIgnore))
 	}
 
-	if cfg.LLMAnalyzer {
-		extManager.Register(llmanalyzer.ExtensionName, cfg)
+	if em.cfg.Builder.LLMAnalyzer {
+		LLMAnalyzer, err := llmanalyzer.New(em.cfg.Builder.Source, em.cfg.Builder.SourceIgnore)
+		if err != nil {
+			return fmt.Errorf("failed to register LLMAnalyzer extension: %w", err)
+		}
+		em.extensions = append(em.extensions, LLMAnalyzer)
 	}
 
-	// Build and append extensions to agent
-	extensions, err := extManager.Build(ctx)
-	if err != nil {
-		return nil, err
+	if em.cfg.Builder.Runtime {
+		em.extensions = append(em.extensions, runtime.New(em.cfg.Builder.Source))
 	}
 
-	return extensions, nil
+	return nil
+}
+
+func (em *Builder) Run(ctx context.Context) ([]*apicore.Extension, error) {
+	var builtExtensions []*apicore.Extension
+
+	for _, ext := range em.extensions {
+		extension, err := ext.Build(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build extension: %w", err)
+		}
+
+		apiExt, err := extension.ToAPIExtension()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert extension to API extension: %w", err)
+		}
+
+		builtExtensions = append(builtExtensions, &apiExt)
+	}
+
+	for _, i := range em.cfg.Model.Extensions {
+		extension := types.AgentExtension{
+			Name:    i.Name,
+			Version: i.Version,
+			Specs:   i.Specs,
+		}
+
+		apiExt, err := extension.ToAPIExtension()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert extension to API extension: %w", err)
+		}
+
+		builtExtensions = append(builtExtensions, &apiExt)
+	}
+
+	return builtExtensions, nil
 }
