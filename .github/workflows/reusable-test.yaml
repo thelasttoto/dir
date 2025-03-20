@@ -48,7 +48,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.1'
-          cache: false
+          check-latest: true
+          cache-dependency-path: "**/*.sum"
 
       - name: Run unit tests
         run: |
@@ -78,7 +79,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.1'
-          cache: false
+          check-latest: true
+          cache-dependency-path: "**/*.sum"
 
       #
       # Install kubernetes tools
