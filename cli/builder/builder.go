@@ -17,19 +17,21 @@ import (
 
 type Builder struct {
 	plugins []clitypes.Builder
+	source  string
 	cfg     *config.Config
 }
 
-func NewBuilder(cfg *config.Config) *Builder {
+func NewBuilder(source string, cfg *config.Config) *Builder {
 	return &Builder{
 		plugins: make([]clitypes.Builder, 0),
+		source:  source,
 		cfg:     cfg,
 	}
 }
 
 func (b *Builder) RegisterPlugins() error {
 	if b.cfg.Builder.LLMAnalyzer {
-		LLMAnalyzer, err := llmanalyzer.New(b.cfg.Builder.Source, b.cfg.Builder.SourceIgnore)
+		LLMAnalyzer, err := llmanalyzer.New(b.source, b.cfg.Builder.SourceIgnore)
 		if err != nil {
 			return fmt.Errorf("failed to register LLMAnalyzer plugin: %w", err)
 		}
@@ -38,50 +40,10 @@ func (b *Builder) RegisterPlugins() error {
 	}
 
 	if b.cfg.Builder.Runtime {
-		b.plugins = append(b.plugins, runtime.New(b.cfg))
+		b.plugins = append(b.plugins, runtime.New(b.source))
 	}
 
 	return nil
-}
-
-func (b *Builder) BuildUserAgent() (*coretypes.Agent, error) {
-	APIExtensions := make([]*coretypes.Extension, 0, len(b.cfg.Model.Extensions))
-
-	for _, i := range b.cfg.Model.Extensions {
-		extension := clitypes.AgentExtension{
-			Name:    i.Name,
-			Version: i.Version,
-			Data:    i.Data,
-		}
-
-		APIExtension, err := extension.ToAPIExtension()
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert extension to API extension: %w", err)
-		}
-
-		APIExtensions = append(APIExtensions, &APIExtension)
-	}
-
-	locators, err := b.cfg.GetAPILocators()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get locators from config: %w", err)
-	}
-
-	skills, err := b.cfg.GetSkills()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get skills from config: %w", err)
-	}
-
-	return &coretypes.Agent{
-		Name:        b.cfg.Model.Name,
-		Version:     b.cfg.Model.Version,
-		Authors:     b.cfg.Model.Authors,
-		CreatedAt:   time.Now().Format(time.RFC3339),
-		Annotations: b.cfg.Model.Annotations,
-		Skills:      skills,
-		Locators:    locators,
-		Extensions:  APIExtensions,
-	}, nil
 }
 
 func (b *Builder) BuildAgent(ctx context.Context) (*coretypes.Agent, error) {
@@ -104,6 +66,7 @@ func (b *Builder) BuildAgent(ctx context.Context) (*coretypes.Agent, error) {
 	}
 
 	return &coretypes.Agent{
+		CreatedAt:  time.Now().Format(time.RFC3339),
 		Extensions: APIExtensions,
 	}, nil
 }
