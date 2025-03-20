@@ -11,6 +11,12 @@ import (
 	"github.com/ipfs/go-datastore/query"
 )
 
+var (
+	// TODO: expose gRPC interfaces over p2p via streams or RPCs.
+	ProtocolID         = "dir/v1.0.0"
+	ProtocolRendezvous = ProtocolID + "connect"
+)
+
 type routing struct {
 	ds types.Datastore
 }
