@@ -5,6 +5,6 @@ package corev1alpha1
 
 import "fmt"
 
-func (skill *Skill) Key() string {
-	return fmt.Sprintf("%s/%s", skill.GetCategoryName(), skill.GetClassName())
+func (e *Extension) Key() string {
+	return fmt.Sprintf("%s/%s", e.GetName(), e.GetVersion())
 }
