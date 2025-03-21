@@ -16,7 +16,7 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-var _ = ginkgo.Describe("DIR Client end-to-end tests", func() {
+var _ = ginkgo.Describe("client end-to-end tests", func() {
 	var err error
 	ctx := context.Background()
 
@@ -82,7 +82,10 @@ var _ = ginkgo.Describe("DIR Client end-to-end tests", func() {
 
 	ginkgo.Context("routing publish and list", func() {
 		ginkgo.It("should publish an agent", func() {
-			err = c.Publish(ctx, ref, agent)
+			err = c.Publish(ctx, &coretypes.ObjectRef{
+				Digest: ref.GetDigest(),
+				Type:   coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
