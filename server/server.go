@@ -39,14 +39,13 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	errCh := make(chan error)
 
 	// Start server
-	server, err := New(cfg)
+	server, err := New(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
+	defer server.Close()
 
-	server.Start(ctx, errCh)
-	defer server.Stop()
-	log.Printf("server started on %s", cfg.ListenAddress)
+	log.Printf("Server started: %s", cfg.ListenAddress)
 
 	// Wait for deactivation
 	sigCh := make(chan os.Signal, 1)
@@ -63,7 +62,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	}
 }
 
-func New(cfg *config.Config) (*Server, error) {
+func New(ctx context.Context, cfg *config.Config) (*Server, error) {
 	// Create local datastore
 	dstore, err := datastore.New(cfg)
 	if err != nil {
@@ -71,10 +70,7 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	// Load API options
-	options := &options{
-		config:    cfg,
-		datastore: dstore,
-	}
+	options := types.NewOptions(cfg, dstore)
 
 	// Create APIs
 	storeAPI, err := store.New(options) //nolint:staticcheck
@@ -82,7 +78,7 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create store: %w", err)
 	}
 
-	routingAPI, err := routing.New(options)
+	routingAPI, err := routing.New(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create routing: %w", err)
 	}
@@ -103,6 +99,11 @@ func New(cfg *config.Config) (*Server, error) {
 	// Register server
 	reflection.Register(server.grpcServer)
 
+	// Start server
+	if err := server.start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start server: %w", err)
+	}
+
 	return server, nil
 }
 
@@ -112,23 +113,24 @@ func (s Server) Store() types.StoreAPI { return s.store }
 
 func (s Server) Routing() types.RoutingAPI { return s.routing }
 
-func (s Server) Start(ctx context.Context, errCh chan<- error) {
+func (s Server) Close() {
+	s.grpcServer.GracefulStop()
+}
+
+func (s Server) start(ctx context.Context) error {
 	// Bootstrap
 	if err := s.bootstrap(ctx); err != nil {
-		errCh <- fmt.Errorf("failed to bootstrap server: %w", err)
-
-		return
+		return fmt.Errorf("failed to bootstrap server: %w", err)
 	}
 
 	// Create a listener on TCP port
 	listen, err := net.Listen("tcp", s.Options().Config().ListenAddress)
 	if err != nil {
-		errCh <- fmt.Errorf("failed to listen on %s: %w", s.Options().Config().ListenAddress, err)
-
-		return
+		return fmt.Errorf("failed to listen on %s: %w", s.Options().Config().ListenAddress, err)
 	}
 
-	// Serve gRPC server
+	// Serve gRPC server in the background.
+	// If the server cannot be started, exit with code 1.
 	go func() {
 		// Start health check server
 		s.healthzServer.Start()
@@ -136,15 +138,11 @@ func (s Server) Start(ctx context.Context, errCh chan<- error) {
 		defer s.healthzServer.SetIsReady(false)
 
 		if err := s.grpcServer.Serve(listen); err != nil {
-			errCh <- fmt.Errorf("failed to start server: %w", err)
-
-			return
+			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
-}
 
-func (s Server) Stop() {
-	s.grpcServer.GracefulStop()
+	return nil
 }
 
 func (s Server) bootstrap(_ context.Context) error {
@@ -152,12 +150,3 @@ func (s Server) bootstrap(_ context.Context) error {
 	// TODO: also update cache datastore
 	return nil
 }
-
-type options struct {
-	config    *config.Config
-	datastore types.Datastore
-}
-
-func (o options) Config() *config.Config { return o.config }
-
-func (o options) Datastore() types.Datastore { return o.datastore }

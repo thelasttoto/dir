@@ -9,6 +9,7 @@ import (
 	"log"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -45,12 +46,46 @@ func New(ctx context.Context, opts ...Option) (*Server, error) {
 	}, nil
 }
 
-// Addresses returns the addresses at which we can reach this server.
+// Info returns the addresses at which we can reach this server.
 func (s *Server) Info() *peer.AddrInfo {
 	return &peer.AddrInfo{
 		ID:    s.host.ID(),
 		Addrs: s.host.Addrs(),
 	}
+}
+
+// Returns p2p specific addresses as addrinfos.
+func (s *Server) P2pInfo() []peer.AddrInfo {
+	var p2pInfos []peer.AddrInfo //nolint:prealloc
+
+	for _, addr := range s.P2pAddrs() {
+		p2pInfo, _ := peer.AddrInfoFromString(addr)
+		p2pInfos = append(p2pInfos, *p2pInfo)
+	}
+
+	return p2pInfos
+}
+
+// Returns p2p specific addresses as strings.
+func (s *Server) P2pAddrs() []string {
+	var p2pAddrs []string //nolint:prealloc
+	for _, addr := range s.host.Addrs() {
+		p2pAddrs = append(p2pAddrs, fmt.Sprintf("%s/p2p/%s", addr.String(), s.host.ID().String()))
+	}
+
+	return p2pAddrs
+}
+
+func (s *Server) Host() host.Host {
+	return s.host
+}
+
+func (s *Server) DHT() *dht.IpfsDHT {
+	return s.dht
+}
+
+func (s *Server) Key() crypto.PrivKey {
+	return s.host.Peerstore().PrivKey(s.host.ID())
 }
 
 // Close stops running services.
@@ -89,7 +124,7 @@ func start(ctx context.Context, opts *options) <-chan status {
 		log.Printf("Host: %v %v", host.ID(), host.Addrs())
 
 		// Create DHT
-		kdht, err := newDHT(ctx, host, opts.BootstrapPeers, opts.RefreshInterval)
+		kdht, err := newDHT(ctx, host, opts.BootstrapPeers, opts.RefreshInterval, opts.DHTCustomOpts...)
 		if err != nil {
 			statusCh <- status{Err: err}
 
