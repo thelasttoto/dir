@@ -76,7 +76,7 @@ func (c *routingCtlr) Publish(ctx context.Context, req *routingtypes.PublishRequ
 	err = c.routing.Publish(ctx, &coretypes.Object{
 		Ref:   ref,
 		Agent: &agent,
-	}, req.GetLocal())
+	}, req.GetNetwork())
 	if err != nil {
 		return nil, fmt.Errorf("failed to publish: %w", err)
 	}
@@ -92,9 +92,7 @@ func (c *routingCtlr) List(req *routingtypes.ListRequest, srv routingtypes.Routi
 
 	items := []*routingtypes.ListResponse_Item{}
 	for i := range itemChan {
-		items = append(items, &routingtypes.ListResponse_Item{
-			Record: i.GetRecord(),
-		})
+		items = append(items, i)
 	}
 
 	if err := srv.Send(&routingtypes.ListResponse{Items: items}); err != nil {

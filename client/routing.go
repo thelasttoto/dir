@@ -14,9 +14,10 @@ import (
 	routingtypes "github.com/agntcy/dir/api/routing/v1alpha1"
 )
 
-func (c *Client) Publish(ctx context.Context, ref *coretypes.ObjectRef) error {
+func (c *Client) Publish(ctx context.Context, ref *coretypes.ObjectRef, network bool) error {
 	_, err := c.RoutingServiceClient.Publish(ctx, &routingtypes.PublishRequest{
-		Record: ref,
+		Record:  ref,
+		Network: &network,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to publish object: %w", err)
@@ -31,10 +32,10 @@ func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-cha
 		return nil, fmt.Errorf("failed to create list stream: %w", err)
 	}
 
-	refs := make(chan *routingtypes.ListResponse_Item)
+	resCh := make(chan *routingtypes.ListResponse_Item, 100) //nolint:mnd
 
 	go func() {
-		defer close(refs)
+		defer close(resCh)
 
 		for {
 			obj, err := stream.Recv()
@@ -50,10 +51,10 @@ func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-cha
 
 			items := obj.GetItems()
 			for _, item := range items {
-				refs <- item
+				resCh <- item
 			}
 		}
 	}()
 
-	return refs, nil
+	return resCh, nil
 }

@@ -1,27 +1,25 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-// nolint:testifylint
+// nolint:testifylint,wsl
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"testing"
 	"time"
 
 	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
 	routingtypes "github.com/agntcy/dir/api/routing/v1alpha1"
-	"github.com/agntcy/dir/server/config"
-	routingconfig "github.com/agntcy/dir/server/routing/config"
-	"github.com/agntcy/dir/server/types"
-	"github.com/ipfs/go-datastore"
-	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPublish_InvalidObject(t *testing.T) {
-	r := &routing{}
+	r := &routeLocal{}
 
 	t.Run("Invalid object", func(t *testing.T) {
 		err := r.Publish(t.Context(), &coretypes.Object{
@@ -34,8 +32,54 @@ func TestPublish_InvalidObject(t *testing.T) {
 	})
 }
 
+type mockStore struct {
+	data map[string]*coretypes.Object
+}
+
+func newMockStore() *mockStore {
+	return &mockStore{
+		data: make(map[string]*coretypes.Object),
+	}
+}
+
+func (m *mockStore) Push(_ context.Context, ref *coretypes.ObjectRef, contents io.Reader) (*coretypes.ObjectRef, error) {
+	b, err := io.ReadAll(contents)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+
+	m.data[ref.GetDigest()] = &coretypes.Object{
+		Ref:   ref,
+		Agent: &coretypes.Agent{},
+		Data:  b,
+	}
+
+	return ref, nil
+}
+
+func (m *mockStore) Lookup(_ context.Context, ref *coretypes.ObjectRef) (*coretypes.ObjectRef, error) {
+	if obj, exists := m.data[ref.GetDigest()]; exists {
+		return obj.GetRef(), nil
+	}
+
+	return nil, errors.New("test object not found")
+}
+
+func (m *mockStore) Pull(_ context.Context, ref *coretypes.ObjectRef) (io.ReadCloser, error) {
+	if obj, exists := m.data[ref.GetDigest()]; exists {
+		return io.NopCloser(bytes.NewReader(obj.GetData())), nil
+	}
+
+	return nil, errors.New("test object not found")
+}
+
+func (m *mockStore) Delete(_ context.Context, ref *coretypes.ObjectRef) error {
+	delete(m.data, ref.GetDigest())
+
+	return nil
+}
+
 func TestPublishList_ValidSingleSkillQuery(t *testing.T) {
-	// Test data
 	var (
 		testAgent = &coretypes.Agent{
 			Skills: []*coretypes.Skill{
@@ -75,32 +119,49 @@ func TestPublishList_ValidSingleSkillQuery(t *testing.T) {
 	)
 
 	// create demo network
-	mainNode := newTestServer(t.Context(), t, nil)
-	r := newTestServer(t.Context(), t, mainNode.server.P2pAddrs())
+	mainNode := newTestServer(t, t.Context(), nil)
+	r := newTestServer(t, t.Context(), mainNode.remote.server.P2pAddrs())
 
 	// wait for connection
-	<-mainNode.server.DHT().RefreshRoutingTable()
+	<-mainNode.remote.server.DHT().RefreshRoutingTable()
 	time.Sleep(1 * time.Second)
 
+	// Mock store
+	mockstore := newMockStore()
+	r.local.store = mockstore
+
+	agentData, err := json.Marshal(testAgent)
+	assert.NoError(t, err)
+
+	_, err = r.local.store.Push(t.Context(), testRef, bytes.NewReader(agentData))
+	assert.NoError(t, err)
+
+	agentData2, err := json.Marshal(testAgent2)
+	assert.NoError(t, err)
+
+	_, err = r.local.store.Push(t.Context(), testRef2, bytes.NewReader(agentData2))
+	assert.NoError(t, err)
+
 	// Publish first agent
-	err := r.Publish(t.Context(), &coretypes.Object{
+	err = r.Publish(t.Context(), &coretypes.Object{
 		Ref:   testRef,
 		Agent: testAgent,
-	}, true)
+	}, false)
 	assert.NoError(t, err)
 
 	// Publish second agent
 	err = r.Publish(t.Context(), &coretypes.Object{
 		Ref:   testRef2,
 		Agent: testAgent2,
-	}, true)
+	}, false)
 	assert.NoError(t, err)
 
 	for k, v := range validQueriesWithExpectedObjectRef {
 		t.Run("Valid query: "+k, func(t *testing.T) {
 			// list
 			refsChan, err := r.List(t.Context(), &routingtypes.ListRequest{
-				Labels: []string{k},
+				Network: toPtr(false),
+				Labels:  []string{k},
 			})
 			assert.NoError(t, err)
 
@@ -145,21 +206,24 @@ func TestPublishList_ValidMultiSkillQuery(t *testing.T) {
 	)
 
 	// create demo network
-	mainNode := newTestServer(t.Context(), t, nil)
-	r := newTestServer(t.Context(), t, mainNode.server.P2pAddrs())
+	mainNode := newTestServer(t, t.Context(), nil)
+	r := newTestServer(t, t.Context(), mainNode.remote.server.P2pAddrs())
 
 	// wait for connection
-	<-mainNode.server.DHT().RefreshRoutingTable()
+	<-mainNode.remote.server.DHT().RefreshRoutingTable()
 	time.Sleep(1 * time.Second)
 
-	// Publish first agent
-	err := r.Publish(t.Context(), &coretypes.Object{
-		Ref:   testRef,
-		Agent: testAgent,
-	}, true)
+	// Mock store
+	mockstore := newMockStore()
+	r.local.store = mockstore
+
+	agentData, err := json.Marshal(testAgent)
 	assert.NoError(t, err)
 
-	// Publish second agent
+	_, err = r.local.store.Push(t.Context(), testRef, bytes.NewReader(agentData))
+	assert.NoError(t, err)
+
+	// Publish first agent
 	err = r.Publish(t.Context(), &coretypes.Object{
 		Ref:   testRef,
 		Agent: testAgent,
@@ -169,7 +233,8 @@ func TestPublishList_ValidMultiSkillQuery(t *testing.T) {
 	t.Run("Valid multi skill query", func(t *testing.T) {
 		// list
 		refsChan, err := r.List(t.Context(), &routingtypes.ListRequest{
-			Labels: []string{"/skills/category1/class1", "/skills/category2/class2"},
+			Network: toPtr(false),
+			Labels:  []string{"/skills/category1/class1", "/skills/category2/class2"},
 		})
 		assert.NoError(t, err)
 
@@ -185,39 +250,4 @@ func TestPublishList_ValidMultiSkillQuery(t *testing.T) {
 		// check if expected ref is present
 		assert.Equal(t, testRef.GetDigest(), refs[0].GetRecord().GetDigest())
 	})
-}
-
-func getObjectRef(a *coretypes.Agent) *coretypes.ObjectRef {
-	raw, _ := json.Marshal(a) //nolint:errchkjson
-
-	return &coretypes.ObjectRef{
-		Type:        coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
-		Digest:      digest.FromBytes(raw).String(),
-		Size:        uint64(len(raw)),
-		Annotations: a.GetAnnotations(),
-	}
-}
-
-func toPtr[T any](v T) *T {
-	return &v
-}
-
-func newTestServer(ctx context.Context, t *testing.T, bootPeers []string) *routing {
-	t.Helper()
-
-	r, err := New(ctx, types.NewOptions(
-		&config.Config{
-			Routing: routingconfig.Config{
-				ListenAddress:  routingconfig.DefaultListenddress,
-				BootstrapPeers: bootPeers,
-			},
-		},
-		datastore.NewMapDatastore(),
-	))
-	assert.NoError(t, err)
-
-	routingInstance, ok := r.(*routing)
-	assert.True(t, ok, "expected *routing type")
-
-	return routingInstance
 }

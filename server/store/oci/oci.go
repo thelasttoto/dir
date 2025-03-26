@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
 	ociconfig "github.com/agntcy/dir/server/store/oci/config"
@@ -114,7 +115,7 @@ func (s *store) Push(ctx context.Context, ref *coretypes.ObjectRef, contents io.
 	// tag => resolves manifest to object which can be looked up (lookup)
 	// tag => allows to pull object directly (pull)
 	// tag => allows listing and filtering tags (list)
-	_, err = oras.Tag(ctx, s.repo, manifestDesc.Digest.String(), blobRef.GetCID().String())
+	_, err = oras.Tag(ctx, s.repo, manifestDesc.Digest.String(), ref.GetShortRef())
 	if err != nil {
 		return nil, err
 	}
@@ -145,10 +146,13 @@ func (s *store) Lookup(ctx context.Context, ref *coretypes.ObjectRef) (*coretype
 	// read manifest data from remote
 	var manifest ocispec.Manifest
 	{
+		shortRef := ref.GetShortRef()
+
 		// resolve manifest from remote tag
-		manifestDesc, err := s.repo.Resolve(ctx, ref.GetCID().String())
+		manifestDesc, err := s.repo.Resolve(ctx, shortRef)
 		if err != nil {
-			// soft fail
+			// do not error here, as we may have a raw object stored but not tagged with
+			// the manifest. only agents are tagged with manifests
 			return ref, nil
 		}
 
@@ -158,7 +162,7 @@ func (s *store) Lookup(ctx context.Context, ref *coretypes.ObjectRef) (*coretype
 		manifestRd, err := s.repo.Fetch(ctx, manifestDesc)
 		if err != nil {
 			// soft fail
-			return ref, nil
+			return ref, fmt.Errorf("failed to fetch manifest: %w", err)
 		}
 
 		// read manifest
@@ -215,14 +219,19 @@ func (s *store) pushData(ctx context.Context, ref *coretypes.ObjectRef, rd io.Re
 		Digest:    ocidigest.Digest(ref.GetDigest()),
 		Size:      int64(ref.GetSize()),
 	}
-	if err := s.repo.Push(ctx, blobDesc, rd); err != nil {
-		return nil, ocispec.Descriptor{}, err
+
+	err := s.repo.Push(ctx, blobDesc, rd)
+	if err != nil {
+		// return only for non-valid errors
+		if !strings.Contains(err.Error(), "already exists") {
+			return nil, ocispec.Descriptor{}, err
+		}
 	}
 
 	// return ref
 	return &coretypes.ObjectRef{
 		Digest: ref.GetDigest(),
-		Type:   coretypes.ObjectType_OBJECT_TYPE_RAW.String(),
+		Type:   ref.GetType(),
 		Size:   uint64(blobDesc.Size),
 	}, blobDesc, nil
 }

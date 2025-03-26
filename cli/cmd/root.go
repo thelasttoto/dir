@@ -8,6 +8,9 @@ import (
 	"fmt"
 
 	"github.com/agntcy/dir/cli/cmd/build"
+	"github.com/agntcy/dir/cli/cmd/info"
+	"github.com/agntcy/dir/cli/cmd/list"
+	"github.com/agntcy/dir/cli/cmd/publish"
 	"github.com/agntcy/dir/cli/cmd/pull"
 	"github.com/agntcy/dir/cli/cmd/push"
 	"github.com/agntcy/dir/cli/util"
@@ -37,14 +40,18 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	// Register client config
-	flags := RootCmd.PersistentFlags()
-	flags.StringVar(&clientConfig.ServerAddress, "server-addr", clientConfig.ServerAddress, "Directory Server API address")
-
-	// Register subcommands
-	RootCmd.AddCommand(build.Command)
-	RootCmd.AddCommand(pull.Command)
-	RootCmd.AddCommand(push.Command)
+	RootCmd.AddCommand(
+		// local commands
+		// TODO: add version command
+		build.Command,
+		// storage commands
+		info.Command,
+		pull.Command,
+		push.Command,
+		// routing commands
+		publish.Command,
+		list.Command,
+	)
 }
 
 func Run(ctx context.Context) error {

@@ -1,39 +1,177 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-package mockrpc
+// nolint
+package rpc
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
-	"time"
 
+	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	routetypes "github.com/agntcy/dir/api/routing/v1alpha1"
+	"github.com/agntcy/dir/server/types"
 	rpc "github.com/libp2p/go-libp2p-gorpc"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
-// TODO: this will be the service that will respond to filtered requests (ie. when we have constrains defined)
-// if no constraints are used, we dont run any RPCs, unless we want better results (ie. data with metadata or full data)
-// this is p2p layer.
+// TODO: proper cleanup and implementation needed!
 
 const (
-	EchoService         = "EchoRPCAPI"
-	EchoServiceFuncEcho = "Echo"
+	Protocol             = protocol.ID("/dir/rpc/1.0.0")
+	DirService           = "RPCAPI"
+	DirServiceFuncLookup = "Lookup"
+	DirServiceFuncPull   = "Pull"
+	DirServiceFuncList   = "List"
+	MaxPullSize          = 4 * 1024 * 1024 // 4 MB
 )
 
-type EchoRPCAPI struct {
+type RPCAPI struct {
 	service *Service
 }
 
-type Envelope struct {
-	Message string
+type PullResponse struct {
+	Digest      string
+	Type        string
+	Size        uint64
+	Annotations map[string]string
+	Data        []byte
 }
 
-func (r *EchoRPCAPI) Echo(_ context.Context, in Envelope, out *Envelope) error {
-	*out = r.service.ReceiveEcho(in)
+type LookupResponse struct {
+	Digest      string
+	Type        string
+	Size        uint64
+	Annotations map[string]string
+}
+
+type ListRequest struct {
+	Peer   string
+	Labels []string
+}
+
+type ListResponse struct {
+	Labels      []string
+	LabelCounts map[string]uint64
+	Peer        string
+	Digest      string
+	Type        string
+	Size        uint64
+	Annotations map[string]string
+}
+
+func (r *RPCAPI) Lookup(ctx context.Context, in *coretypes.ObjectRef, out *LookupResponse) error {
+	log.Printf("P2p RPC: Executing Lookup request on remote peer %s", r.service.host.ID())
+
+	// validate request
+	if in == nil || out == nil {
+		return errors.New("invalid request: nil request/response")
+	}
+
+	// handle lookup
+	meta, err := r.service.store.Lookup(ctx, in)
+	if err != nil {
+		return fmt.Errorf("failed to lookup: %w", err)
+	}
+
+	// write result
+	*out = LookupResponse{
+		Digest:      meta.GetDigest(),
+		Type:        meta.GetType(),
+		Size:        meta.GetSize(),
+		Annotations: meta.Annotations,
+	}
+
+	return nil
+}
+
+func (r *RPCAPI) Pull(ctx context.Context, in *coretypes.ObjectRef, out *PullResponse) error {
+	log.Printf("P2p RPC: Executing Pull request on remote peer %s", r.service.host.ID())
+
+	// validate request
+	if in == nil || out == nil {
+		return errors.New("invalid request: nil request/response")
+	}
+
+	// lookup
+	meta, err := r.service.store.Lookup(ctx, in)
+	if err != nil {
+		return fmt.Errorf("failed to lookup: %w", err)
+	}
+
+	// validate lookup before pull
+	if meta.GetType() != coretypes.ObjectType_OBJECT_TYPE_AGENT.String() {
+		return errors.New("can only pull agent object")
+	}
+
+	if meta.GetSize() > MaxPullSize {
+		return fmt.Errorf("object too large to pull: %d bytes", meta.GetSize())
+	}
+
+	// pull data
+	reader, err := r.service.store.Pull(ctx, meta)
+	if err != nil {
+		return fmt.Errorf("failed to pull: %w", err)
+	}
+	defer reader.Close()
+
+	// read result from reader
+	data, err := io.ReadAll(io.LimitReader(reader, MaxPullSize))
+	if err != nil {
+		return fmt.Errorf("failed to read: %w", err)
+	}
+
+	// set output
+	*out = PullResponse{
+		Digest:      meta.GetDigest(),
+		Type:        meta.GetType(),
+		Size:        meta.GetSize(),
+		Data:        data,
+		Annotations: meta.Annotations,
+	}
+
+	return nil
+}
+
+func (r *RPCAPI) List(ctx context.Context, inCh <-chan *ListRequest, outCh chan<- *ListResponse) error {
+	defer close(outCh)
+
+	for in := range inCh {
+		log.Printf("P2p RPC: Executing List request on remote peer %s", r.service.host.ID())
+
+		// list
+		listCh, err := r.service.route.List(ctx, &routetypes.ListRequest{
+			Labels: in.Labels,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to lookup: %w", err)
+		}
+
+		// resolve response before forwarding
+		for item := range listCh {
+			result := &ListResponse{
+				Labels:      item.Labels,
+				LabelCounts: item.LabelCounts,
+				Peer:        in.Peer,
+			}
+
+			if record := item.Record; record != nil {
+				result.Annotations = record.Annotations
+				result.Size = record.Size
+				result.Digest = record.Digest
+				result.Type = record.Type
+			}
+
+			// forward data
+			outCh <- result
+		}
+	}
 
 	return nil
 }
@@ -42,127 +180,151 @@ type Service struct {
 	rpcServer *rpc.Server
 	rpcClient *rpc.Client
 	host      host.Host
-	protocol  protocol.ID
-	listenCh  chan<- string
-	ignored   peerMap
+	store     types.StoreAPI
+	route     types.RoutingAPI
 }
 
-func Start(ctx context.Context, host host.Host, protocol protocol.ID, listenCh chan<- string, ignored []peer.AddrInfo) error {
+func New(ctx context.Context, host host.Host, store types.StoreAPI, route types.RoutingAPI) (*Service, error) {
 	service := &Service{
-		host:     host,
-		protocol: protocol,
-		listenCh: listenCh,
-		ignored:  newPeerMap(append(peer.AddrInfosToIDs(ignored), host.ID())),
+		rpcServer: rpc.NewServer(host, Protocol),
+		host:      host,
+		store:     store,
+		route:     route,
 	}
 
-	err := service.SetupRPC()
+	// register api
+	rpcAPI := RPCAPI{service: service}
+
+	err := service.rpcServer.Register(&rpcAPI)
 	if err != nil {
-		return err
+		return nil, err //nolint:wrapcheck
 	}
 
-	// send dummy message
-	go service.StartMessaging(ctx)
+	// update client
+	service.rpcClient = rpc.NewClientWithServer(host, Protocol, service.rpcServer)
 
-	return nil
+	return service, nil
 }
 
-func (s *Service) StartMessaging(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 1)
-	defer ticker.Stop()
+func (s *Service) Lookup(ctx context.Context, peer peer.ID, req *coretypes.ObjectRef) (*coretypes.ObjectRef, error) {
+	var resp LookupResponse
 
-	for {
-		select {
-		case <-ctx.Done():
+	err := s.rpcClient.CallContext(ctx, peer, DirService, DirServiceFuncLookup, req, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &coretypes.ObjectRef{
+		Digest:      resp.Digest,
+		Type:        resp.Type,
+		Size:        resp.Size,
+		Annotations: resp.Annotations,
+	}, nil
+}
+
+func (s *Service) Pull(ctx context.Context, peer peer.ID, req *coretypes.ObjectRef) (*coretypes.Object, error) {
+	var resp PullResponse
+
+	err := s.rpcClient.CallContext(ctx, peer, DirService, DirServiceFuncPull, req, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	// convert to agent
+	var agent *coretypes.Agent
+	if err := json.Unmarshal(resp.Data, &agent); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal: %w", err)
+	}
+
+	return &coretypes.Object{
+		Ref: &coretypes.ObjectRef{
+			Digest:      resp.Digest,
+			Type:        resp.Type,
+			Size:        resp.Size,
+			Annotations: resp.Annotations,
+		},
+		Agent: agent,
+	}, nil
+}
+
+// range over the result channel, then read the error after the loop.
+// this is done in best effort mode.
+func (s *Service) List(ctx context.Context, peers []peer.ID, req *routetypes.ListRequest) (<-chan *routetypes.ListResponse_Item, error) {
+	// reserve reasonable buffer size for output results
+	respCh := make(chan *routetypes.ListResponse_Item, 10000)
+
+	// these are the peers we are interested in
+	// does not allow self-querying as it will create an infinite loop
+	reqPeers := filterPeers(s.host.ID(), peers)
+	if len(reqPeers) == 0 {
+		return nil, errors.New("no peers to list from")
+	}
+
+	// run processing in the background
+	outCh := make(chan *ListResponse, 10000) // used as intermediary forwarding channel
+	go func() {
+		// run logic in the background
+		// prepare inputs for each call
+		inCh := make(chan *ListRequest, len(reqPeers)+1)
+		for _, peer := range reqPeers {
+			inCh <- &ListRequest{
+				Peer:   peer.String(),
+				Labels: req.Labels,
+			}
+		}
+		close(inCh)
+
+		// run async
+		errs := s.rpcClient.MultiStream(ctx,
+			reqPeers,
+			DirService,
+			DirServiceFuncList,
+			inCh,
+			outCh,
+		)
+
+		// log error
+		if err := errors.Join(errs...); err != nil {
+			log.Printf("Failed to process all List RPC requests, reason: %v", err)
+
 			return
-		case <-ticker.C:
-			s.Echo(ctx, "Message: Hello from "+s.host.ID().String())
 		}
-	}
-}
 
-func (s *Service) SetupRPC() error {
-	echoRPCAPI := EchoRPCAPI{service: s}
+		log.Printf("Successfully listed data from peers: %s", peers)
+	}()
 
-	s.rpcServer = rpc.NewServer(s.host, s.protocol)
+	// forward results from one goroutine to the output channel
+	go func() {
+		// close resp channel once done so the subscribers can finish
+		defer close(respCh)
 
-	err := s.rpcServer.Register(&echoRPCAPI)
-	if err != nil {
-		return err //nolint:wrapcheck
-	}
-
-	s.rpcClient = rpc.NewClientWithServer(s.host, s.protocol, s.rpcServer)
-
-	return nil
-}
-
-func (s *Service) Echo(ctx context.Context, message string) {
-	peers := filterPeers(s.host.Peerstore().Peers(), s.ignored)
-	replies := make([]*Envelope, len(peers))
-
-	// Send message to all peers
-	errs := s.rpcClient.MultiCall(
-		newCtxsN(ctx, len(peers)),
-		peers,
-		EchoService,
-		EchoServiceFuncEcho,
-		Envelope{Message: message},
-		copyEnvelopesToIfaces(replies),
-	)
-
-	// Check responses from peers
-	for i, err := range errs {
-		if err != nil {
-			log.Printf("Peer %s returned error: %-v\n", peers[i].String(), err)
-		} else {
-			log.Printf("Peer %s echoed: %s\n", peers[i].String(), replies[i].Message)
+		// forward data to response channel
+		for out := range outCh {
+			respCh <- &routetypes.ListResponse_Item{
+				Labels:      out.Labels,
+				LabelCounts: out.LabelCounts,
+				Peer: &routetypes.Peer{
+					Id: out.Peer,
+				},
+				Record: &coretypes.ObjectRef{
+					Digest:      out.Digest,
+					Type:        out.Type,
+					Size:        out.Size,
+					Annotations: out.Annotations,
+				},
+			}
 		}
-	}
+	}()
+
+	return respCh, nil
 }
 
-func (s *Service) ReceiveEcho(e Envelope) Envelope {
-	msg := fmt.Sprintf("Peer %s echoing: %s", s.host.ID(), e.Message)
-	s.listenCh <- msg
-
-	return Envelope{Message: msg}
-}
-
-func newCtxsN(ctx context.Context, n int) []context.Context {
-	ctxs := make([]context.Context, 0, n)
-	for range n {
-		ctxs = append(ctxs, ctx)
-	}
-
-	return ctxs
-}
-
-func copyEnvelopesToIfaces(in []*Envelope) []interface{} {
-	ifaces := make([]interface{}, len(in))
-
-	for i := range in {
-		in[i] = &Envelope{}
-		ifaces[i] = in[i]
-	}
-
-	return ifaces
-}
-
-type peerMap map[peer.ID]struct{}
-
-func newPeerMap(peers peer.IDSlice) peerMap {
-	peerMap := peerMap{}
-	for _, peer := range peers {
-		peerMap[peer] = struct{}{}
-	}
-
-	return peerMap
-}
-
-func filterPeers(peers peer.IDSlice, ignored peerMap) peer.IDSlice {
+func filterPeers(self peer.ID, peers []peer.ID) peer.IDSlice {
 	var filtered peer.IDSlice
 
-	for _, p := range peers {
-		if _, exists := ignored[p]; !exists {
-			filtered = append(filtered, p)
+	for _, pID := range peers {
+		if pID != self {
+			filtered = append(filtered, pID)
 		}
 	}
 

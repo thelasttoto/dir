@@ -1,15 +1,15 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-package pull
+package publish
 
 var opts = &options{}
 
 type options struct {
-	FormatRaw bool
+	Network bool
 }
 
 func init() {
 	flags := Command.Flags()
-	flags.BoolVar(&opts.FormatRaw, "raw", false, "Output in Raw format. Defaults to JSON.")
+	flags.BoolVar(&opts.Network, "network", false, "Publish data to the network")
 }
