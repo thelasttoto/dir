@@ -7,7 +7,6 @@ package oci
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"strconv"
@@ -46,12 +45,12 @@ func TestStore(t *testing.T) {
 	store := loadLocalStore(t)
 
 	// load agent
-	agentRaw, err := os.ReadFile(testAgentPath)
-	assert.NoErrorf(t, err, "failed to load test agent")
-
 	agent := &coretypes.Agent{}
-	err = json.Unmarshal(agentRaw, &agent)
-	assert.NoErrorf(t, err, "failed to parse test agent")
+
+	agentRaw, err := agent.LoadFromFile(testAgentPath)
+	if err != nil {
+		t.Fatalf("failed to load test agent: %v", err)
+	}
 
 	objRef := getRefForData(coretypes.ObjectType_OBJECT_TYPE_AGENT.String(), agentRaw, map[string]string{
 		"name":       agent.GetName(),
@@ -76,9 +75,13 @@ func TestStore(t *testing.T) {
 	assert.Equal(t, agentRaw, fetchedContents)
 
 	// delete op
-	// todo: verify delete op via lookup
 	err = store.Delete(testCtx, dgst)
 	assert.NoErrorf(t, err, "delete failed")
+
+	// lookup op
+	_, err = store.Lookup(testCtx, dgst)
+	assert.Error(t, err, "lookup should fail after delete")
+	assert.EqualError(t, err, "digest does not exist")
 }
 
 func BenchmarkLocalStore(b *testing.B) {
