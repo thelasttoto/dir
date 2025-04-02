@@ -54,3 +54,14 @@ func (r *route) List(ctx context.Context, req *routingtypes.ListRequest) (<-chan
 
 	return r.remote.List(ctx, req)
 }
+
+func (r *route) Unpublish(ctx context.Context, object *coretypes.Object, _ bool) error {
+	err := r.local.Unpublish(ctx, object)
+	if err != nil {
+		return fmt.Errorf("failed to unpublish locally: %w", err)
+	}
+
+	// no need to explicitly handle unpublishing from the network
+	// TODO clarify if network sync trigger is needed here
+	return nil
+}
