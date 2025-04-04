@@ -11,6 +11,7 @@ import (
 	"github.com/agntcy/dir/cli/cmd/delete"
 	"github.com/agntcy/dir/cli/cmd/info"
 	"github.com/agntcy/dir/cli/cmd/list"
+	"github.com/agntcy/dir/cli/cmd/network"
 	"github.com/agntcy/dir/cli/cmd/publish"
 	"github.com/agntcy/dir/cli/cmd/pull"
 	"github.com/agntcy/dir/cli/cmd/push"
@@ -43,6 +44,8 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
+	network.Command.Hidden = true
+
 	RootCmd.AddCommand(
 		// local commands
 		version.Command,
@@ -56,6 +59,7 @@ func init() {
 		publish.Command,
 		list.Command,
 		unpublish.Command,
+		network.Command,
 	)
 }
 

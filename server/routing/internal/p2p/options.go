@@ -4,7 +4,9 @@
 package p2p
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"golang.org/x/crypto/ssh"
 )
 
 type APIRegistrer func(host.Host) error
@@ -55,13 +58,25 @@ func WithIdentityKeyPath(keyPath string) Option {
 		}
 
 		// Read data
-		keyData, err := os.ReadFile(keyPath)
+		keyBytes, err := os.ReadFile(keyPath)
 		if err != nil {
 			return fmt.Errorf("failed to read key: %w", err)
 		}
 
+		// Parse the private key
+		key, err := ssh.ParseRawPrivateKey(keyBytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+
+		// Try to convert to ED25519 private key
+		ed25519Key, ok := key.(ed25519.PrivateKey)
+		if !ok {
+			return errors.New("key is not an ED25519 private key")
+		}
+
 		// Generate random key
-		generatedKey, err := crypto.UnmarshalEd25519PrivateKey(keyData)
+		generatedKey, err := crypto.UnmarshalEd25519PrivateKey(ed25519Key)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal identity key: %w", err)
 		}
