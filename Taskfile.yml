@@ -39,6 +39,8 @@ vars:
   GOLANGCI_LINT_BIN: '{{ .BIN_DIR }}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
   LICENSEI_VERSION: '0.9.0'
   LICENSEI_BIN: '{{ .BIN_DIR }}/licensei-{{.LICENSEI_VERSION}}'
+  UV_VERSION: '0.6.1'
+  UV_BIN: '{{ .BIN_DIR }}/uv-{{.UV_VERSION}}'
 
 tasks:
   ##
@@ -123,9 +125,21 @@ tasks:
 
   api:clean:
     desc: Clean generated API stubs
+    deps:
+      - api:clean:go
+      - api:clean:python
+
+  api:clean:go:
+    desc: Clean generated golang API stubs
     dir: ./api
     cmds:
-      - find . \( -name "*.pb.go" -o -name "*_grpc.pb.go" -o -name "*.pb.gw.go" \) -type f -delete
+      - find . \( -name "*.pb.go" -o -name "*.pb.gw.go" \) -type f -delete
+
+  api:clean:python:
+    desc: Clean generated python API stubs
+    dir: ./api/python
+    cmds:
+      - find . \( -name "*_pb2_grpc.py" -o -name "*_pb2.py" -o -name "*_pb2.pyi" \) -type f -delete
 
   api:test:
     desc: Unit test API code
@@ -175,9 +189,25 @@ tasks:
   ##
   client:test:
     desc: Unit test Client code
+    deps:
+      - task: client:test:go
+      - task: client:test:python
+
+  client:test:go:
+    desc: Unit test Go Client code
     dir: ./client
     cmds:
       - go -C . test ./... {{.EXTRA_ARGS}}
+  
+  client:test:python:
+    desc: Unit test Python Client code
+    deps:
+      - deps:uv
+    dir: ./client/python/tests
+    env:
+      PYTHONPATH: '{{ .ROOT_DIR }}/client/python/client/proto'
+    cmds:
+      - '{{.UV_BIN}} run pytest test_client.py'
 
   ##
   ## Server
@@ -226,7 +256,7 @@ tasks:
           }
         }
         EOF
-  
+
         # run docker with attached volume
         docker run \
               -it \
@@ -700,6 +730,21 @@ tasks:
       - chmod +x {{.LICENSEI_BIN}}
     status:
       - test -x {{.LICENSEI_BIN}}
+  
+  deps:uv:
+    desc: Install uv
+    internal: true
+    deps:
+      - deps:bin-dir
+    env:
+      UV_INSTALL_DIR: '{{ .BIN_DIR }}'
+    cmds:
+      - curl -sfL https://astral.sh/uv/{{.UV_VERSION}}/install.sh | sh
+      - mv {{.BIN_DIR}}/uv {{.UV_BIN}}
+      - chmod +x {{.UV_BIN}}
+      - rm {{.BIN_DIR}}/uvx
+    status:
+      - test -x {{.BIN_DIR}}/uv
 
   ##
   ## Helm
