@@ -11,6 +11,11 @@ on:
   workflow_call:
   workflow_dispatch:
 
+
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
     brew-formula-update:
         env:
@@ -47,10 +52,14 @@ jobs:
                     git config user.name "github-actions[bot]"
                     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                    git checkout -B chore/brew-formula-update
+                    git remote set-url origin https://github.com/agntcy/dir.git
+
+                    git push origin --delete chore/brew-formula-update || true
+
+                    git checkout -B chore/brew-formula-update origin/main
 
                     # Replace version
-                    sed -i "s/version "v*.*.*"/version "${{ steps.release-infos.outputs.LATEST_VERSION }}"/" HomebrewFormula/dirctl.rb
+                    sed -i "s/version \"v*.*.*\"/version \""${{ steps.release-infos.outputs.LATEST_VERSION }}"\"/" HomebrewFormula/dirctl.rb
 
                     # Replace hashes
                     sed -i "/url \".*\/dirctl-darwin-arm64\"/ {N;s/sha256 \".*\"/sha256 \"${{ steps.release-infos.outputs.DIRCTL_HASH_DARWIN_ARM }}\"/}" ./HomebrewFormula/dirctl.rb
@@ -63,16 +72,22 @@ jobs:
                     sed -i "/url \".*\/dirctl-hub-linux-arm64\"/ {N;s/sha256 \".*\"/sha256 \"${{ steps.release-infos.outputs.DIRCTL_HUB_HASH_LINUX_ARM }}\"/}" ./HomebrewFormula/dirctl.rb
                     sed -i "/url \".*\/dirctl-hub-linux-amd64\"/ {N;s/sha256 \".*\"/sha256 \"${{ steps.release-infos.outputs.DIRCTL_HUB_HASH_LINUX_AMD }}\"/}" ./HomebrewFormula/dirctl.rb
 
-                    $DIFF_FOUND=$(git diff --exit-code)
+                    DIFF_FOUND=0
+
+                    if ! git diff --exit-code; then
+                      DIFF_FOUND=1
+                    fi
+
                     echo "DIFF_FOUND=$DIFF_FOUND" >> $GITHUB_OUTPUT
 
-                    if [ $DIFF_FOUND ]; then
+                    if [ $DIFF_FOUND -eq 1 ]; then
                       git commit ./HomebrewFormula/dirctl.rb -m "chore: update brew formula version" --signoff
-                      git push
+
+                      git push --set-upstream origin chore/brew-formula-update
                     fi
 
             - name: Test new formula
-              if: ${{ steps.brew-formula.outputs.DIFF_FOUND }}
+              if: ${{ steps.brew-formula.outputs.DIFF_FOUND == 1 }}
               run: |
                   apt update && apt install curl git -y
 
@@ -85,9 +100,9 @@ jobs:
                   dirctl --help
 
             - name: Create PR
-              if: ${{ steps.brew-formula.outputs.DIFF_FOUND }}
+              if: ${{ steps.brew-formula.outputs.DIFF_FOUND == 1 }}
               run: |
-                    gh pr create --title "chore: update brew formula by ci"
+                    gh pr create --title "chore: update brew formula to ${{ steps.release-infos.outputs.LATEST_VERSION }}" --body "This PR is created by brew-formula-update workflow."
 
 
 
