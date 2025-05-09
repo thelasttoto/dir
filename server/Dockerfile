@@ -25,7 +25,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 ARG BUILD_OPTS
 ARG EXTRA_LDFLAGS
 
-ENV CGO_ENABLED=1
+# TODO(adamtagscherer): Currently we don't need C libraries but in the future we may need to turn this on once we add
+# security libraries, etc.
+ENV CGO_ENABLED=0
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -35,12 +37,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 RUN xx-verify /bin/apiserver
 
-FROM alpine:3.20@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
+FROM gcr.io/distroless/static:nonroot@sha256:c0f429e16b13e583da7e5a6ec20dd656d325d88e6819cafe0adb0828976529dc
+WORKDIR /
+COPY --from=builder /bin/apiserver ./apiserver
 
-RUN apk add --update --no-cache \
-    ca-certificates \
-    libc6-compat
-
-COPY --from=builder ["/bin/apiserver", "/bin/apiserver"]
-
-ENTRYPOINT ["/bin/apiserver", "run"]
+USER 65532:65532
+ENTRYPOINT ["./apiserver", "run"]
