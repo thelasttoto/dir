@@ -1,6 +1,7 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
+// Package token provides utilities for working with JWT tokens, including validation, refresh, and claim extraction.
 package token
 
 import (
@@ -9,11 +10,8 @@ import (
 	"net/http"
 
 	"github.com/agntcy/dir/hub/client/okta"
-	"github.com/agntcy/dir/hub/cmd/options"
 	"github.com/agntcy/dir/hub/sessionstore"
-	"github.com/agntcy/dir/hub/utils/context"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -21,32 +19,10 @@ const (
 	userClaim       = "sub"
 )
 
-func RefreshContextTokenIfExpired(cmd *cobra.Command, opts *options.HubOptions) error {
-	sessionStore, ok := context.GetSessionStoreFromContext(cmd)
-	if !ok {
-		return errors.New("failed to get session store from context")
-	}
-
-	session, ok := context.GetCurrentHubSessionFromContext(cmd)
-	if !ok {
-		return errors.New("failed to get current session from context")
-	}
-
-	oktaClient, ok := context.GetOktaClientFromContext(cmd)
-	if !ok {
-		return errors.New("failed to get okta client from context")
-	}
-
-	return refreshTokenIfExpired(
-		cmd,
-		opts.ServerAddress,
-		session,
-		sessionStore,
-		oktaClient,
-	)
-}
-
-func refreshTokenIfExpired(cmd *cobra.Command, sessionKey string, session *sessionstore.HubSession, secretStore sessionstore.SessionStore, oktaClient okta.Client) error {
+// RefreshTokenIfExpired refreshes the access token for the current session if it is expired.
+// It uses the provided Okta client and session store to update the session and persist the new tokens.
+// Returns an error if the refresh or save fails.
+func RefreshTokenIfExpired(sessionKey string, session *sessionstore.HubSession, secretStore sessionstore.SessionStore, oktaClient okta.Client) error {
 	if session == nil ||
 		session.Tokens == nil ||
 		session.CurrentTenant == "" ||
@@ -85,11 +61,6 @@ func refreshTokenIfExpired(cmd *cobra.Command, sessionKey string, session *sessi
 	}
 	session.Tokens[session.CurrentTenant] = newTokenSecret
 
-	// Update context with new token
-	if ok := context.SetCurrentHubSessionForContext(cmd, session); !ok {
-		return errors.New("failed to set current hub session for context")
-	}
-
 	// Update tokens store with new token
 	if err = secretStore.SaveHubSession(sessionKey, session); err != nil {
 		return fmt.Errorf("failed to save hub tokens: %w", err)
@@ -98,14 +69,17 @@ func refreshTokenIfExpired(cmd *cobra.Command, sessionKey string, session *sessi
 	return nil
 }
 
+// GetTenantNameFromToken extracts the tenant name from the given JWT access token.
 func GetTenantNameFromToken(token string) (string, error) {
 	return getClaimFromToken(token, tenantNameClaim)
 }
 
+// GetUserFromToken extracts the user (subject) from the given JWT access token.
 func GetUserFromToken(token string) (string, error) {
 	return getClaimFromToken(token, userClaim)
 }
 
+// getClaimFromToken extracts a string claim from the given JWT access token.
 func getClaimFromToken(token, claim string) (string, error) {
 	claims := jwt.MapClaims{}
 	if _, _, err := jwt.NewParser().ParseUnverified(token, &claims); err != nil {

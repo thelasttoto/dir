@@ -1,9 +1,11 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
+// Package cmd provides the CLI commands for the Agent Hub, including login, logout, push, pull, and org management.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -16,13 +18,17 @@ import (
 	"github.com/agntcy/dir/hub/cmd/push"
 	"github.com/agntcy/dir/hub/config"
 	"github.com/agntcy/dir/hub/sessionstore"
-	ctxUtils "github.com/agntcy/dir/hub/utils/context"
 	"github.com/agntcy/dir/hub/utils/file"
 	httpUtils "github.com/agntcy/dir/hub/utils/http"
+	"github.com/agntcy/dir/hub/utils/token"
 	"github.com/spf13/cobra"
 )
 
-func NewHubCommand(baseOption *options.BaseOption) *cobra.Command {
+// NewHubCommand creates the root "hub" command for the Agent Hub CLI.
+// It sets up persistent pre-run logic for session/config loading and token refresh,
+// attaches the session to the command context, and adds all subcommands (login, logout, push, pull, orgs).
+// Returns the configured *cobra.Command.
+func NewHubCommand(ctx context.Context, baseOption *options.BaseOption) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hub",
 		Short: "Manage the Agent Hub",
@@ -30,8 +36,11 @@ func NewHubCommand(baseOption *options.BaseOption) *cobra.Command {
 		TraverseChildren: true,
 	}
 
+	cmd.SetContext(ctx)
+
 	opts := options.NewHubOptions(baseOption, cmd)
 
+	//nolint:contextcheck // context is set via cmd.SetContext(ctx) and accessed via cmd.Context()
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		opts.Complete()
 
@@ -46,7 +55,7 @@ func NewHubCommand(baseOption *options.BaseOption) *cobra.Command {
 			currentSession = &sessionstore.HubSession{}
 		}
 
-		authConfig, err := config.FetchAuthConfig(opts.ServerAddress)
+		authConfig, err := config.FetchAuthConfig(cmd.Context(), opts.ServerAddress)
 		if err != nil {
 			return fmt.Errorf("failed to fetch auth config: %w", err)
 		}
@@ -60,18 +69,21 @@ func NewHubCommand(baseOption *options.BaseOption) *cobra.Command {
 			HubBackendAddress:  authConfig.HubBackendAddress,
 		}
 
-		if ok := ctxUtils.SetSessionStoreForContext(cmd, sessionStore); !ok {
-			return errors.New("failed to set session store for context")
+		// Only refresh token if not running login or logout
+		if cmd.Name() != "login" && cmd.Name() != "logout" {
+			oktaClient := okta.NewClient(authConfig.IdpIssuerAddress, httpUtils.CreateSecureHTTPClient())
+			if err := token.RefreshTokenIfExpired(opts.ServerAddress, currentSession, sessionStore, oktaClient); err != nil {
+				return fmt.Errorf("failed to refresh expired access token: %w", err)
+			}
 		}
 
-		if ok := ctxUtils.SetCurrentHubSessionForContext(cmd, currentSession); !ok {
-			return errors.New("failed to set current hub session for context")
+		if err := sessionStore.SaveHubSession(opts.ServerAddress, currentSession); err != nil {
+			return fmt.Errorf("failed to save updated session with auth config: %w", err)
 		}
 
-		oktaClient := okta.NewClient(authConfig.IdpIssuerAddress, httpUtils.CreateSecureHTTPClient())
-		if ok := ctxUtils.SetOktaClientForContext(cmd, oktaClient); !ok {
-			return errors.New("failed to set okta client for context")
-		}
+		// Attach the session to cmd.Context()
+		ctx := context.WithValue(cmd.Context(), sessionstore.SessionContextKey, currentSession)
+		cmd.SetContext(ctx)
 
 		return nil
 	}
@@ -80,7 +92,7 @@ func NewHubCommand(baseOption *options.BaseOption) *cobra.Command {
 		login.NewCommand(opts),
 		logout.NewCommand(opts),
 		push.NewCommand(opts),
-		pull.NewCommand(opts),
+		pull.NewCommand(),
 		orgs.NewCommand(opts),
 	)
 

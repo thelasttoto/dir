@@ -1,24 +1,24 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
+// Package push provides the CLI command for pushing models to the Agent Hub.
 package push
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/agntcy/dir/cli/util/agent"
-	"github.com/agntcy/dir/hub/api/v1alpha1"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
-	ctxUtils "github.com/agntcy/dir/hub/utils/context"
-	"github.com/agntcy/dir/hub/utils/token"
-	"github.com/google/uuid"
+	"github.com/agntcy/dir/hub/service"
+	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc/metadata"
 )
 
+// NewCommand creates the "push" command for the Agent Hub CLI.
+// It pushes a model to the hub by repository name or ID, reading the model from a file or stdin.
+// Returns the configured *cobra.Command.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "push {<repository> | <repository_id>} {<model.json> | --stdin} ",
@@ -44,25 +44,16 @@ Examples:
 
 	opts := hubOptions.NewHubPushOptions(hubOpts, cmd)
 
-	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
-		if err := token.ValidateAccessTokenFromContext(cmd); err != nil {
-			return fmt.Errorf("failed to validate access token: %w", err)
-		}
-
-		if err := token.RefreshContextTokenIfExpired(cmd, opts.HubOptions); err != nil {
-			return fmt.Errorf("failed to refresh expired access token: %w", err)
-		}
-
-		return nil
-	}
-
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		session, ok := ctxUtils.GetCurrentHubSessionFromContext(cmd)
-		if !ok {
+		// Retrieve session from context
+		ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
+
+		currentSession, ok := ctxSession.(*sessionstore.HubSession)
+		if !ok || currentSession == nil {
 			return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
 		}
 
-		hc, err := hubClient.New(session.HubBackendAddress)
+		hc, err := hubClient.New(currentSession.HubBackendAddress)
 		if err != nil {
 			return fmt.Errorf("failed to create hub client: %w", err)
 		}
@@ -87,11 +78,9 @@ Examples:
 		}
 
 		// TODO: Push based on repoName and version misleading
-		repoID := parseRepoTagID(args[0])
+		repoID := service.ParseRepoTagID(args[0])
 
-		ctx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+session.Tokens[session.CurrentTenant].AccessToken))
-
-		resp, err := hc.PushAgent(ctx, agentBytes, repoID)
+		resp, err := service.PushAgent(cmd.Context(), hc, agentBytes, repoID, currentSession)
 		if err != nil {
 			return fmt.Errorf("failed to push agent: %w", err)
 		}
@@ -102,12 +91,4 @@ Examples:
 	}
 
 	return cmd
-}
-
-func parseRepoTagID(id string) any {
-	if _, err := uuid.Parse(id); err == nil {
-		return &v1alpha1.PushAgentRequest_RepositoryId{RepositoryId: id}
-	}
-
-	return &v1alpha1.PushAgentRequest_RepositoryName{RepositoryName: id}
 }

@@ -1,6 +1,7 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
+// Package config provides configuration management for the Agent Hub CLI and related applications.
 package config
 
 import (
@@ -22,6 +23,7 @@ var (
 	ErrParsingConfig      = errors.New("error parsing config")
 )
 
+// AuthConfig holds authentication and backend configuration values loaded from the IDP config endpoint.
 type AuthConfig struct {
 	IdpProductID       string `json:"IAM_PRODUCT_ID"`
 	ClientID           string `json:"IAM_OIDC_CLIENT_ID"`
@@ -31,12 +33,15 @@ type AuthConfig struct {
 	HubBackendAddress  string `json:"HUB_API"`
 }
 
-func FetchAuthConfig(frontedURL string) (*AuthConfig, error) {
+// FetchAuthConfig retrieves and parses the AuthConfig from the given frontend URL.
+// It validates the URL, fetches the config.json, and normalizes backend addresses.
+// Returns the AuthConfig or an error if the operation fails.
+func FetchAuthConfig(ctx context.Context, frontedURL string) (*AuthConfig, error) {
 	if err := url.ValidateSecureURL(frontedURL); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidFrontendURL, err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, frontedURL+"/config.json", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, frontedURL+"/config.json", nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFetchingConfig, err)
 	}
