@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	routing "github.com/agntcy/dir/server/routing/config"
+	search "github.com/agntcy/dir/server/search/config"
+	sqliteconfig "github.com/agntcy/dir/server/search/sqlite/config"
 	localfs "github.com/agntcy/dir/server/store/localfs/config"
 	oci "github.com/agntcy/dir/server/store/oci/config"
 	"github.com/agntcy/dir/utils/logging"
@@ -47,6 +49,9 @@ type Config struct {
 
 	// Routing configuration
 	Routing routing.Config `json:"routing,omitempty" mapstructure:"routing"`
+
+	// Search configuration
+	Search search.Config `json:"search,omitempty" mapstructure:"search"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -131,6 +136,15 @@ func LoadConfig() (*Config, error) {
 
 	_ = v.BindEnv("routing.datastore_dir")
 	v.SetDefault("routing.datastore_dir", "")
+
+	//
+	// Search configuration
+	//
+	_ = v.BindEnv("search.db_type")
+	v.SetDefault("search.db_type", search.DefaultDBType)
+
+	_ = v.BindEnv("search.sqlite.db_path")
+	v.SetDefault("search.sqlite.db_path", sqliteconfig.DefaultSQLiteDBPath)
 
 	// Load configuration into struct
 	decodeHooks := mapstructure.ComposeDecodeHookFunc(

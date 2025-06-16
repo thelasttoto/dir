@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	routing "github.com/agntcy/dir/server/routing/config"
+	search "github.com/agntcy/dir/server/search/config"
+	sqliteconfig "github.com/agntcy/dir/server/search/sqlite/config"
 	localfs "github.com/agntcy/dir/server/store/localfs/config"
 	oci "github.com/agntcy/dir/server/store/oci/config"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +39,8 @@ func TestConfig(t *testing.T) {
 				"DIRECTORY_SERVER_ROUTING_LISTEN_ADDRESS":        "/ip4/1.1.1.1/tcp/1",
 				"DIRECTORY_SERVER_ROUTING_BOOTSTRAP_PEERS":       "/ip4/1.1.1.1/tcp/1,/ip4/1.1.1.1/tcp/2",
 				"DIRECTORY_SERVER_ROUTING_KEY_PATH":              "/path/to/key",
+				"DIRECTORY_SERVER_SEARCH_DB_TYPE":                "sqlite",
+				"DIRECTORY_SERVER_SEARCH_SQLITE_DB_PATH":         "sqlite.db",
 			},
 			ExpectedConfig: &Config{
 				ListenAddress:      "example.com:8889",
@@ -65,6 +69,12 @@ func TestConfig(t *testing.T) {
 					},
 					KeyPath: "/path/to/key",
 				},
+				Search: search.Config{
+					DBType: "sqlite",
+					SQLite: sqliteconfig.Config{
+						DBPath: "sqlite.db",
+					},
+				},
 			},
 		},
 		{
@@ -87,6 +97,12 @@ func TestConfig(t *testing.T) {
 				Routing: routing.Config{
 					ListenAddress:  routing.DefaultListenAddress,
 					BootstrapPeers: routing.DefaultBootstrapPeers,
+				},
+				Search: search.Config{
+					DBType: search.DefaultDBType,
+					SQLite: sqliteconfig.Config{
+						DBPath: sqliteconfig.DefaultSQLiteDBPath,
+					},
 				},
 			},
 		},
