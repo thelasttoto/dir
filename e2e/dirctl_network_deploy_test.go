@@ -11,7 +11,6 @@ import (
 	"github.com/agntcy/dir/e2e/config"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/opencontainers/go-digest"
 )
 
 const (
@@ -30,7 +29,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 	})
 
 	// Test params
-	var tempAgentDigest string
+	var tempAgentCID string
 
 	ginkgo.It("should push an agent to peer 1", func() {
 		var outputBuffer bytes.Buffer
@@ -47,11 +46,9 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		err := pushCmd.Execute()
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		tempAgentDigest = outputBuffer.String()
+		tempAgentCID = outputBuffer.String()
 
-		// Ensure the digest is valid
-		_, err = digest.Parse(tempAgentDigest)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// TODO: Validate CID
 	})
 
 	ginkgo.It("should pull the agent from peer 1", func() {
@@ -61,7 +58,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		pullCmd.SetOut(&outputBuffer)
 		pullCmd.SetArgs([]string{
 			"pull",
-			tempAgentDigest,
+			tempAgentCID,
 			"--server-addr",
 			Peer1Addr,
 		})
@@ -77,7 +74,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		pullCmd.SetOut(&outputBuffer)
 		pullCmd.SetArgs([]string{
 			"pull",
-			tempAgentDigest,
+			tempAgentCID,
 			"--server-addr",
 			Peer2Addr,
 		})
@@ -93,7 +90,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		publishCmd.SetOut(&outputBuffer)
 		publishCmd.SetArgs([]string{
 			"publish",
-			tempAgentDigest,
+			tempAgentCID,
 			"--server-addr",
 			Peer1Addr,
 			"--network",
@@ -110,7 +107,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		publishCmd.SetOut(&outputBuffer)
 		publishCmd.SetArgs([]string{
 			"publish",
-			tempAgentDigest,
+			tempAgentCID,
 			"--server-addr",
 			Peer2Addr,
 			"--network",
@@ -120,7 +117,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 		gomega.Expect(err).To(gomega.HaveOccurred())
 	})
 
-	ginkgo.It("should list by digest on all peers", func() {
+	ginkgo.It("should list by CID on all peers", func() {
 		for _, addr := range peerAddrs {
 			var outputBuffer bytes.Buffer
 
@@ -129,7 +126,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 			listCmd.SetArgs([]string{
 				"list",
 				"--digest",
-				tempAgentDigest,
+				tempAgentCID,
 				"--server-addr",
 				addr,
 			})
@@ -148,7 +145,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 
 			// Build the expected output string
 			expectedOutput := "Peer " + peerID + "\n" +
-				"  Digest: " + tempAgentDigest + "\n" +
+				"  CID: " + tempAgentCID + "\n" +
 				"  Labels: /skills/Natural Language Processing/Text Completion, /skills/Natural Language Processing/Problem Solving, /domains/research, /features/runtime/framework, /features/runtime/language"
 
 			// Validate the output matches the expected format
@@ -183,7 +180,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a network multi p
 
 			// Build the expected output string
 			expectedOutput := "Peer " + peerID + "\n" +
-				"  Digest: " + tempAgentDigest + "\n" +
+				"  CID: " + tempAgentCID + "\n" +
 				"  Labels: /skills/Natural Language Processing/Text Completion, /skills/Natural Language Processing/Problem Solving, /domains/research, /features/runtime/framework, /features/runtime/language"
 
 			// Validate the output matches the expected format

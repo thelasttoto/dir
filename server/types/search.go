@@ -3,31 +3,6 @@
 
 package types
 
-type SkillObject interface {
-	GetID() uint64
-	GetName() string
-}
-
-type LocatorObject interface {
-	GetType() string
-	GetUrl() string
-}
-
-type ExtensionObject interface {
-	GetName() string
-	GetVersion() string
-}
-
-type RecordObject interface {
-	GetName() string
-	GetVersion() string
-	GetCID() string
-
-	GetSkillObjects() []SkillObject
-	GetLocatorObjects() []LocatorObject
-	GetExtensionObjects() []ExtensionObject
-}
-
 type RecordFilters struct {
 	Limit             int
 	Offset            int
@@ -114,9 +89,9 @@ func WithExtensionVersions(versions ...string) FilterOption {
 }
 
 type SearchAPI interface {
-	// AddRecord adds a new agent record to the search database.
-	AddRecord(record RecordObject) error
+	// AddRecord adds a new record to the search database.
+	AddRecord(record Record) error
 
-	// GetRecords retrieves agent records based on the provided RecordFilters.
-	GetRecords(opts ...FilterOption) ([]RecordObject, error)
+	// GetRecords retrieves records based on the provided RecordFilters.
+	GetRecords(opts ...FilterOption) ([]Record, error)
 }

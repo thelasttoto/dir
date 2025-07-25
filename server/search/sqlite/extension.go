@@ -17,6 +17,11 @@ type Extension struct {
 	Version string `gorm:"not null"`
 }
 
+func (extension *Extension) GetAnnotations() map[string]string {
+	// SQLite extensions don't store annotations, return empty map
+	return make(map[string]string)
+}
+
 func (extension *Extension) GetName() string {
 	return extension.Name
 }
@@ -25,18 +30,23 @@ func (extension *Extension) GetVersion() string {
 	return extension.Version
 }
 
-func (d *DB) addExtensionTx(tx *gorm.DB, extensionObject types.ExtensionObject, agentID uint) (uint, error) {
-	extension := &Extension{
+func (extension *Extension) GetData() map[string]any {
+	// SQLite extensions don't store data, return empty map
+	return make(map[string]any)
+}
+
+func (d *DB) addExtensionTx(tx *gorm.DB, extension types.Extension, agentID uint) (uint, error) {
+	sqliteExtension := &Extension{
 		AgentID: agentID,
-		Name:    extensionObject.GetName(),
-		Version: extensionObject.GetVersion(),
+		Name:    extension.GetName(),
+		Version: extension.GetVersion(),
 	}
 
-	if err := tx.Create(extension).Error; err != nil {
+	if err := tx.Create(sqliteExtension).Error; err != nil {
 		return 0, fmt.Errorf("failed to add extension to SQLite search database: %w", err)
 	}
 
-	logger.Debug("Added extension to SQLite search database", "agent_id", agentID, "extension_id", extension.ID)
+	logger.Debug("Added extension to SQLite search database", "agent_id", agentID, "extension_id", sqliteExtension.ID)
 
-	return extension.ID, nil
+	return sqliteExtension.ID, nil
 }

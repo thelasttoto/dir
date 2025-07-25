@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	routetypes "github.com/agntcy/dir/api/routing/v1alpha1"
+	routetypes "github.com/agntcy/dir/api/routing/v1alpha2"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
 	"github.com/spf13/cobra"
@@ -53,13 +53,13 @@ func runCommand(cmd *cobra.Command) error {
 
 	// Set max hops when searching the network
 	maxHops := uint32(10) //nolint:mnd
-	networkList := opts.Network || peer != nil
 
 	// Start the list request
 	items, err := c.List(cmd.Context(), &routetypes.ListRequest{
-		Peer:    peer,
-		MaxHops: &maxHops,
-		Network: &networkList,
+		LegacyListRequest: &routetypes.LegacyListRequest{
+			Peer:    peer,
+			MaxHops: &maxHops,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list peers: %w", err)

@@ -41,7 +41,7 @@ func (c *searchCtlr) Search(req *searchtypes.SearchRequest, srv searchtypes.Sear
 	}
 
 	for _, r := range records {
-		if err := srv.Send(&searchtypes.SearchResponse{RecordCid: r.GetCID()}); err != nil {
+		if err := srv.Send(&searchtypes.SearchResponse{RecordCid: r.GetCid()}); err != nil {
 			return fmt.Errorf("failed to send record: %w", err)
 		}
 	}

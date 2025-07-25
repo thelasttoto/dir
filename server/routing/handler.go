@@ -6,10 +6,8 @@ package routing
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strings"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/utils/logging"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-kad-dht/providers"
@@ -29,7 +27,7 @@ type handler struct {
 }
 
 type handlerSync struct {
-	Ref  *coretypes.ObjectRef
+	Ref  *corev1.RecordRef
 	Peer peer.AddrInfo
 }
 
@@ -68,7 +66,7 @@ func (h *handler) handleAnnounce(_ context.Context, key []byte, prov peer.AddrIn
 		return nil
 	}
 
-	// get ref digest from request
+	// get ref cid from request
 	// if this fails, it may mean that it's not DIR-constructed CID
 	cast, err := mh.Cast(key)
 	if err != nil {
@@ -78,22 +76,14 @@ func (h *handler) handleAnnounce(_ context.Context, key []byte, prov peer.AddrIn
 	}
 
 	// create CID from multihash
-	// NOTE: we can only get the digest here, but not the type
-	// NOTE: we have to reach out to the provider anyway to update data
-	ref := &coretypes.ObjectRef{}
-
-	err = ref.FromCID(cid.NewCidV1(cid.Raw, cast))
-	if err != nil {
-		handlerLogger.Error("Failed to create object reference from CID", "error", err)
-
-		return nil
+	ref := &corev1.RecordRef{
+		Cid: cid.NewCidV1(1, cast).String(),
 	}
 
-	// validate if valid sha256 digest
-	if !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(strings.TrimPrefix(ref.GetDigest(), "sha256:")) {
-		handlerLogger.Info("Ignoring announcement event for invalid object", "digest", ref.GetDigest())
+	// Validate that we have a non-empty CID
+	if ref.GetCid() == "" {
+		handlerLogger.Info("Ignoring announcement event for empty CID")
 
-		// this is not an object of interest
 		return nil
 	}
 

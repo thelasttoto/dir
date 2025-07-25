@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"strings"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
-	routetypes "github.com/agntcy/dir/api/routing/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
+	routingtypes "github.com/agntcy/dir/api/routing/v1alpha2"
 	"github.com/agntcy/dir/cli/presenter"
 	"github.com/agntcy/dir/client"
 	"github.com/spf13/cobra"
 )
 
-func listDigest(cmd *cobra.Command, client *client.Client, digest string) error {
-	// Start the list request
-	networkList := true
+const (
+	UnknownCID = "unknown"
+)
 
-	items, err := client.List(cmd.Context(), &routetypes.ListRequest{
-		Network: &networkList,
-		Record: &coretypes.ObjectRef{
-			Digest: digest,
+func listDigest(cmd *cobra.Command, client *client.Client, digest string) error {
+	items, err := client.List(cmd.Context(), &routingtypes.ListRequest{
+		LegacyListRequest: &routingtypes.LegacyListRequest{
+			Ref: &corev1.RecordRef{
+				Cid: digest, // Use digest as CID directly
+			},
 		},
 	})
 	if err != nil {
@@ -30,10 +32,17 @@ func listDigest(cmd *cobra.Command, client *client.Client, digest string) error 
 
 	// Print the results
 	for item := range items {
+		var cid string
+		if ref := item.GetRef(); ref != nil {
+			cid = ref.GetCid()
+		} else {
+			cid = UnknownCID
+		}
+
 		presenter.Printf(cmd,
-			"Peer %s\n  Digest: %s\n  Labels: %s\n",
+			"Peer %s\n  CID: %s\n  Labels: %s\n",
 			item.GetPeer().GetId(),
-			item.GetRecord().GetDigest(),
+			cid,
 			strings.Join(item.GetLabels(), ", "),
 		)
 	}

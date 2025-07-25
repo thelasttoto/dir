@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
 	"github.com/spf13/cobra"
@@ -41,10 +41,8 @@ func runCommand(cmd *cobra.Command, digest string) error {
 	}
 
 	// Delete object from store
-	err := c.Delete(cmd.Context(), &coretypes.ObjectRef{
-		Digest:      digest,
-		Type:        coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
-		Annotations: nil,
+	err := c.Delete(cmd.Context(), &corev1.RecordRef{
+		Cid: digest, // Use digest as CID directly
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete agent model: %w", err)

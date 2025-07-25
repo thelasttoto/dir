@@ -8,7 +8,6 @@ replace (
 )
 
 require (
-	buf.build/gen/go/agntcy/oasf/protocolbuffers/go v1.36.6-20250714145403-2a698bed604a.1
 	github.com/Portshift/go-utils v0.0.0-20220421083203-89265d8a6487
 	github.com/agntcy/dir/api v0.2.6
 	github.com/agntcy/dir/utils v0.2.6
@@ -43,6 +42,7 @@ require (
 	github.com/libp2p/go-libp2p-record v0.3.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	go.opentelemetry.io/otel/sdk v1.36.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	modernc.org/libc v1.22.5 // indirect

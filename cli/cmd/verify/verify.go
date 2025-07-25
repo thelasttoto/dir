@@ -10,7 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
+	objectsv1 "github.com/agntcy/dir/api/objects/v1"
 	signv1alpha1 "github.com/agntcy/dir/api/sign/v1alpha1"
 	"github.com/agntcy/dir/cli/presenter"
 	agentUtils "github.com/agntcy/dir/cli/util/agent"
@@ -62,11 +63,23 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		return errors.New("failed to get client from context")
 	}
 
-	agent := &coretypes.Agent{}
+	// Load OASF data (supports v1, v2, v3) into a Record
+	record, err := corev1.LoadOASFFromReader(source)
+	if err != nil {
+		return fmt.Errorf("failed to load OASF: %w", err)
+	}
 
-	// Load into an Agent struct
-	if _, err := agent.LoadFromReader(source); err != nil {
-		return fmt.Errorf("failed to load agent: %w", err)
+	// Extract v1 Agent for verification (verification service currently only supports v1)
+	var agent *objectsv1.Agent
+	switch data := record.GetData().(type) {
+	case *corev1.Record_V1:
+		agent = data.V1
+	case *corev1.Record_V2:
+		return errors.New("verification of OASF v0.4.0 records is not yet supported")
+	case *corev1.Record_V3:
+		return errors.New("verification of OASF v0.5.0 records is not yet supported")
+	default:
+		return errors.New("unsupported record type for verification")
 	}
 
 	//nolint:nestif
@@ -78,7 +91,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		}
 
 		req := &signv1alpha1.VerifyRequest{
-			Agent: agent.Agent,
+			Agent: agent,
 			Provider: &signv1alpha1.VerifyRequestProvider{
 				Provider: &signv1alpha1.VerifyRequestProvider_Key{
 					Key: &signv1alpha1.VerifyWithKey{
@@ -95,7 +108,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		}
 	} else {
 		req := &signv1alpha1.VerifyRequest{
-			Agent: agent.Agent,
+			Agent: agent,
 			Provider: &signv1alpha1.VerifyRequestProvider{
 				Provider: &signv1alpha1.VerifyRequestProvider_Oidc{
 					Oidc: &signv1alpha1.VerifyWithOIDC{

@@ -5,17 +5,14 @@
 package push
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/cli/presenter"
+	agentUtils "github.com/agntcy/dir/cli/util/agent"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
-	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 )
 
@@ -35,12 +32,6 @@ Usage examples:
 
 	cat model.json | dirctl push --stdin
 
-3. In combination with other commands such as build and pull:
-
-	dirctl build | dirctl push --stdin
-
-	dirctl pull <digest> | dirctl push --stdin
-
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var path string
@@ -51,9 +42,9 @@ Usage examples:
 		}
 
 		// get source
-		source, err := getReader(path, opts.FromStdin)
+		source, err := agentUtils.GetReader(path, opts.FromStdin)
 		if err != nil {
-			return err
+			return err //nolint:wrapcheck // Error is already wrapped
 		}
 
 		return runCommand(cmd, source)
@@ -69,49 +60,19 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		return errors.New("failed to get client from context")
 	}
 
-	// Unmarshal the content into an Agent struct.
-	agent := &coretypes.Agent{}
-
-	_, err := agent.LoadFromReader(source)
+	// Load OASF data (supports v1, v2, v3) into a Record
+	record, err := corev1.LoadOASFFromReader(source)
 	if err != nil {
-		return fmt.Errorf("failed to load agent: %w", err)
+		return fmt.Errorf("failed to load OASF: %w", err)
 	}
 
-	// Marshal the Agent struct back to bytes.
-	data, err := json.Marshal(agent)
-	if err != nil {
-		return fmt.Errorf("failed to marshal agent: %w", err)
-	}
-
-	// Use the client's Push method to send the data.
-	ref, err := c.Push(cmd.Context(), &coretypes.ObjectRef{
-		Digest:      digest.FromBytes(data).String(),
-		Type:        coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
-		Size:        uint64(len(data)),
-		Annotations: agent.GetAnnotations(),
-	}, bytes.NewReader(data))
+	// Use the client's Push method to send the record
+	recordRef, err := c.Push(cmd.Context(), record)
 	if err != nil {
 		return fmt.Errorf("failed to push data: %w", err)
 	}
 
-	presenter.Print(cmd, ref.GetDigest())
+	presenter.Print(cmd, recordRef.GetCid())
 
 	return nil
-}
-
-func getReader(fpath string, fromFile bool) (io.ReadCloser, error) {
-	if fpath == "" && !fromFile {
-		return nil, errors.New("required file path or --stdin flag")
-	}
-
-	if fpath != "" {
-		file, err := os.Open(fpath)
-		if err != nil {
-			return nil, fmt.Errorf("could not open file %s: %w", fpath, err)
-		}
-
-		return file, nil
-	}
-
-	return os.Stdin, nil
 }

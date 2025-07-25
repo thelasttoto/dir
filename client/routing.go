@@ -9,17 +9,16 @@ import (
 	"fmt"
 	"io"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
-	routingtypes "github.com/agntcy/dir/api/routing/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
+	routingtypes "github.com/agntcy/dir/api/routing/v1alpha2"
 	"github.com/agntcy/dir/utils/logging"
 )
 
 var logger = logging.Logger("client")
 
-func (c *Client) Publish(ctx context.Context, ref *coretypes.ObjectRef, network bool) error {
+func (c *Client) Publish(ctx context.Context, ref *corev1.RecordRef) error {
 	_, err := c.RoutingServiceClient.Publish(ctx, &routingtypes.PublishRequest{
-		Record:  ref,
-		Network: &network,
+		RecordCid: ref.GetCid(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to publish object: %w", err)
@@ -28,13 +27,13 @@ func (c *Client) Publish(ctx context.Context, ref *coretypes.ObjectRef, network 
 	return nil
 }
 
-func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-chan *routingtypes.ListResponse_Item, error) {
+func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-chan *routingtypes.LegacyListResponse_Item, error) {
 	stream, err := c.RoutingServiceClient.List(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create list stream: %w", err)
 	}
 
-	resCh := make(chan *routingtypes.ListResponse_Item, 100) //nolint:mnd
+	resCh := make(chan *routingtypes.LegacyListResponse_Item, 100) //nolint:mnd
 
 	go func() {
 		defer close(resCh)
@@ -51,7 +50,7 @@ func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-cha
 				return
 			}
 
-			items := obj.GetItems()
+			items := obj.GetLegacyListResponse().GetItems()
 			for _, item := range items {
 				resCh <- item
 			}
@@ -61,10 +60,9 @@ func (c *Client) List(ctx context.Context, req *routingtypes.ListRequest) (<-cha
 	return resCh, nil
 }
 
-func (c *Client) Unpublish(ctx context.Context, ref *coretypes.ObjectRef, network bool) error {
+func (c *Client) Unpublish(ctx context.Context, ref *corev1.RecordRef) error {
 	_, err := c.RoutingServiceClient.Unpublish(ctx, &routingtypes.UnpublishRequest{
-		Record:  ref,
-		Network: &network,
+		RecordCid: ref.GetCid(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to unpublish object: %w", err)

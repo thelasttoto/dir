@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
 	"github.com/spf13/cobra"
@@ -47,19 +47,21 @@ func runCommand(cmd *cobra.Command, digest string) error {
 		return errors.New("failed to get client from context")
 	}
 
-	// Lookup from digest
-	meta, err := c.Lookup(cmd.Context(), &coretypes.ObjectRef{
-		Type:   coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
-		Digest: digest,
-	})
+	// Create RecordRef from digest
+	recordRef := &corev1.RecordRef{
+		Cid: digest, // Use digest as CID directly
+	}
+
+	// Lookup metadata to verify record exists
+	_, err := c.Lookup(cmd.Context(), recordRef)
 	if err != nil {
 		return fmt.Errorf("failed to lookup: %w", err)
 	}
 
-	presenter.Printf(cmd, "Publishing agent with digest: %s\n", meta.GetDigest())
+	presenter.Printf(cmd, "Publishing record with CID: %s\n", recordRef.GetCid())
 
-	// Start publishing
-	if err := c.Publish(cmd.Context(), meta, opts.Network); err != nil {
+	// Start publishing using the same RecordRef
+	if err := c.Publish(cmd.Context(), recordRef); err != nil {
 		if strings.Contains(err.Error(), "failed to announce object") {
 			return errors.New("failed to announce object, it will be retried in the background on the API server")
 		}

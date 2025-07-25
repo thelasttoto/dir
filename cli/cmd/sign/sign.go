@@ -11,8 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	objectsv1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v1"
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	objectsv1 "github.com/agntcy/dir/api/objects/v1"
 	signv1alpha1 "github.com/agntcy/dir/api/sign/v1alpha1"
 	"github.com/agntcy/dir/cli/presenter"
 	agentUtils "github.com/agntcy/dir/cli/util/agent"
@@ -71,7 +70,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		return errors.New("failed to get client from context")
 	}
 
-	agent := &coretypes.Agent{}
+	agent := &objectsv1.Agent{}
 
 	// Load into an Agent struct
 	if _, err := agent.LoadFromReader(source); err != nil {
@@ -98,7 +97,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		}
 
 		req := &signv1alpha1.SignRequest{
-			Agent: agent.Agent,
+			Agent: agent,
 			Provider: &signv1alpha1.SignRequestProvider{
 				Provider: &signv1alpha1.SignRequestProvider_Key{
 					Key: &signv1alpha1.SignWithKey{
@@ -118,7 +117,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		agentSigned = response.GetAgent()
 	} else if opts.OIDCToken != "" {
 		req := &signv1alpha1.SignRequest{
-			Agent: agent.Agent,
+			Agent: agent,
 			Provider: &signv1alpha1.SignRequestProvider{
 				Provider: &signv1alpha1.SignRequestProvider_Oidc{
 					Oidc: &signv1alpha1.SignWithOIDC{
@@ -149,7 +148,7 @@ func runCommand(cmd *cobra.Command, source io.ReadCloser) error {
 		}
 
 		req := &signv1alpha1.SignRequest{
-			Agent: agent.Agent,
+			Agent: agent,
 			Provider: &signv1alpha1.SignRequestProvider{
 				Provider: &signv1alpha1.SignRequestProvider_Oidc{
 					Oidc: &signv1alpha1.SignWithOIDC{

@@ -26,6 +26,12 @@ linters:
     - err113
     - tenv # deprecated
 
+issues:
+  exclude-rules:
+    - path: types/adapters/record_oasfv.*\.go
+      linters:
+        - dupl
+
 linters-settings:
   gomoddirectives:
     # Allow local `replace` directives. Default is false.

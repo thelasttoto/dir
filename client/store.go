@@ -4,96 +4,196 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"io"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 )
 
-// Push
-// TODO: when pushing extension data, squash items and push individually before pushing agent.
-// TODO: this allows larger agent file while keeping data in extension compact.
-func (c *Client) Push(ctx context.Context, ref *coretypes.ObjectRef, reader io.Reader) (*coretypes.ObjectRef, error) {
+// Push sends a complete record to the store and returns a record reference.
+// The record must be ≤4MB as per the v1alpha2 store service specification.
+func (c *Client) Push(ctx context.Context, record *corev1.Record) (*corev1.RecordRef, error) {
+	// Create streaming client
 	stream, err := c.StoreServiceClient.Push(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create push stream: %w", err)
 	}
 
-	buf := make([]byte, chunkSize)
-
-	for {
-		n, err := reader.Read(buf)
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("failed to read data: %w", err)
-		}
-
-		if n == 0 {
-			break
-		}
-
-		obj := &coretypes.Object{
-			Ref:  ref,
-			Data: buf[:n],
-		}
-
-		if err := stream.Send(obj); err != nil {
-			return nil, fmt.Errorf("could not send object: %w", err)
-		}
+	// Send complete record (up to 4MB)
+	if err := stream.Send(record); err != nil {
+		return nil, fmt.Errorf("failed to send record: %w", err)
 	}
 
-	resp, err := stream.CloseAndRecv()
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return nil, fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// Receive response for this record
+	recordRef, err := stream.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("could not receive response: %w", err)
+		return nil, fmt.Errorf("failed to receive record ref: %w", err)
 	}
 
-	return resp, nil
+	return recordRef, nil
 }
 
-// Pull
-// TODO: needs to pull each extension data individually and send back.
-func (c *Client) Pull(ctx context.Context, ref *coretypes.ObjectRef) (io.Reader, error) {
-	stream, err := c.StoreServiceClient.Pull(ctx, ref)
+// Pull retrieves a complete record from the store using its reference.
+func (c *Client) Pull(ctx context.Context, recordRef *corev1.RecordRef) (*corev1.Record, error) {
+	// Create streaming client
+	stream, err := c.StoreServiceClient.Pull(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pull stream: %w", err)
 	}
 
-	var buffer bytes.Buffer
-
-	for {
-		obj, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to receive object: %w", err)
-		}
-
-		if _, err := buffer.Write(obj.GetData()); err != nil {
-			return nil, fmt.Errorf("failed to write data to buffer: %w", err)
-		}
+	// Send record reference
+	if err := stream.Send(recordRef); err != nil {
+		return nil, fmt.Errorf("failed to send record ref: %w", err)
 	}
 
-	return &buffer, nil
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return nil, fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// Receive complete record
+	record, err := stream.Recv()
+	if err != nil {
+		return nil, fmt.Errorf("failed to receive record: %w", err)
+	}
+
+	return record, nil
 }
 
-func (c *Client) Lookup(ctx context.Context, ref *coretypes.ObjectRef) (*coretypes.ObjectRef, error) {
-	meta, err := c.StoreServiceClient.Lookup(ctx, ref)
+// Lookup retrieves metadata for a record using its reference.
+func (c *Client) Lookup(ctx context.Context, recordRef *corev1.RecordRef) (*corev1.RecordMeta, error) {
+	// Create streaming client
+	stream, err := c.StoreServiceClient.Lookup(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup object: %w", err)
+		return nil, fmt.Errorf("failed to create lookup stream: %w", err)
 	}
 
-	return meta, nil
+	// Send record reference
+	if err := stream.Send(recordRef); err != nil {
+		return nil, fmt.Errorf("failed to send record ref: %w", err)
+	}
+
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return nil, fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// Receive record metadata
+	recordMeta, err := stream.Recv()
+	if err != nil {
+		return nil, fmt.Errorf("failed to receive record metadata: %w", err)
+	}
+
+	return recordMeta, nil
 }
 
-func (c *Client) Delete(ctx context.Context, ref *coretypes.ObjectRef) error {
-	_, err := c.StoreServiceClient.Delete(ctx, ref)
+// Delete removes a record from the store using its reference.
+func (c *Client) Delete(ctx context.Context, recordRef *corev1.RecordRef) error {
+	// Create streaming client
+	stream, err := c.StoreServiceClient.Delete(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to delete object: %w", err)
+		return fmt.Errorf("failed to create delete stream: %w", err)
 	}
 
+	// Send record reference
+	if err := stream.Send(recordRef); err != nil {
+		return fmt.Errorf("failed to send record ref: %w", err)
+	}
+
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// For delete, we don't expect a response (just confirmation of completion)
+	// The stream will close when the operation is complete
 	return nil
+}
+
+// PushBatch sends multiple records in a single stream for efficiency.
+// This takes advantage of the streaming interface for batch operations.
+//
+//nolint:dupl // Similar structure to PullBatch but semantically different operations
+func (c *Client) PushBatch(ctx context.Context, records []*corev1.Record) ([]*corev1.RecordRef, error) {
+	if len(records) == 0 {
+		return nil, nil
+	}
+
+	// Create streaming client
+	stream, err := c.StoreServiceClient.Push(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create push stream: %w", err)
+	}
+
+	// Send all records
+	for i, record := range records {
+		if err := stream.Send(record); err != nil {
+			return nil, fmt.Errorf("failed to send record %d: %w", i, err)
+		}
+	}
+
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return nil, fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// Receive all responses
+	var refs []*corev1.RecordRef //nolint:prealloc // We don't know the number of records in advance
+
+	for i := range records {
+		recordRef, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive record ref %d: %w", i, err)
+		}
+
+		refs = append(refs, recordRef)
+	}
+
+	return refs, nil
+}
+
+// PullBatch retrieves multiple records in a single stream for efficiency.
+//
+//nolint:dupl // Similar structure to PushBatch but semantically different operations
+func (c *Client) PullBatch(ctx context.Context, recordRefs []*corev1.RecordRef) ([]*corev1.Record, error) {
+	if len(recordRefs) == 0 {
+		return nil, nil
+	}
+
+	// Create streaming client
+	stream, err := c.StoreServiceClient.Pull(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pull stream: %w", err)
+	}
+
+	// Send all record references
+	for i, recordRef := range recordRefs {
+		if err := stream.Send(recordRef); err != nil {
+			return nil, fmt.Errorf("failed to send record ref %d: %w", i, err)
+		}
+	}
+
+	// Close send stream
+	if err := stream.CloseSend(); err != nil {
+		return nil, fmt.Errorf("failed to close send stream: %w", err)
+	}
+
+	// Receive all records
+	var records []*corev1.Record //nolint:prealloc // We don't know the number of records in advance
+
+	for i := range recordRefs {
+		record, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive record %d: %w", i, err)
+		}
+
+		records = append(records, record)
+	}
+
+	return records, nil
 }

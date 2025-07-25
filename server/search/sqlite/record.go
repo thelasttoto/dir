@@ -22,81 +22,129 @@ type Record struct {
 	Extensions []Extension `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE"`
 }
 
-func (r *Record) GetName() string {
-	return r.Name
-}
-
-func (r *Record) GetVersion() string {
-	return r.Version
-}
-
-func (r *Record) GetCID() string {
+// Implement central Record interface.
+func (r *Record) GetCid() string {
 	return r.CID
 }
 
-func (r *Record) GetSkillObjects() []types.SkillObject {
-	skills := make([]types.SkillObject, len(r.Skills))
-	for i, skill := range r.Skills {
+func (r *Record) GetRecordData() types.RecordData {
+	return &RecordDataAdapter{record: r}
+}
+
+// RecordDataAdapter adapts SQLite Record to central RecordData interface.
+type RecordDataAdapter struct {
+	record *Record
+}
+
+func (r *RecordDataAdapter) GetAnnotations() map[string]string {
+	// SQLite records don't store annotations, return empty map
+	return make(map[string]string)
+}
+
+func (r *RecordDataAdapter) GetSchemaVersion() string {
+	// Default schema version for search records
+	return "v1"
+}
+
+func (r *RecordDataAdapter) GetName() string {
+	return r.record.Name
+}
+
+func (r *RecordDataAdapter) GetVersion() string {
+	return r.record.Version
+}
+
+func (r *RecordDataAdapter) GetDescription() string {
+	// SQLite records don't store description
+	return ""
+}
+
+func (r *RecordDataAdapter) GetAuthors() []string {
+	// SQLite records don't store authors
+	return []string{}
+}
+
+func (r *RecordDataAdapter) GetCreatedAt() string {
+	return r.record.CreatedAt.Format("2006-01-02T15:04:05Z")
+}
+
+func (r *RecordDataAdapter) GetSkills() []types.Skill {
+	skills := make([]types.Skill, len(r.record.Skills))
+	for i, skill := range r.record.Skills {
 		skills[i] = &skill
 	}
 
 	return skills
 }
 
-func (r *Record) GetLocatorObjects() []types.LocatorObject {
-	locators := make([]types.LocatorObject, len(r.Locators))
-	for i, locator := range r.Locators {
+func (r *RecordDataAdapter) GetLocators() []types.Locator {
+	locators := make([]types.Locator, len(r.record.Locators))
+	for i, locator := range r.record.Locators {
 		locators[i] = &locator
 	}
 
 	return locators
 }
 
-func (r *Record) GetExtensionObjects() []types.ExtensionObject {
-	extensions := make([]types.ExtensionObject, len(r.Extensions))
-	for i, extension := range r.Extensions {
+func (r *RecordDataAdapter) GetExtensions() []types.Extension {
+	extensions := make([]types.Extension, len(r.record.Extensions))
+	for i, extension := range r.record.Extensions {
 		extensions[i] = &extension
 	}
 
 	return extensions
 }
 
-func (d *DB) addRecordTx(tx *gorm.DB, recordObject types.RecordObject) (uint, error) {
-	record := &Record{
-		Name:    recordObject.GetName(),
-		Version: recordObject.GetVersion(),
-		CID:     recordObject.GetCID(),
+func (r *RecordDataAdapter) GetSignature() types.Signature {
+	// SQLite records don't store signature information
+	return nil
+}
+
+func (r *RecordDataAdapter) GetPreviousRecordCid() string {
+	// SQLite records don't store previous record CID
+	return ""
+}
+
+func (d *DB) addRecordTx(tx *gorm.DB, record types.Record) (uint, error) {
+	recordData := record.GetRecordData()
+
+	sqliteRecord := &Record{
+		Name:    recordData.GetName(),
+		Version: recordData.GetVersion(),
+		CID:     record.GetCid(),
 	}
 
-	if err := tx.Create(record).Error; err != nil {
+	if err := tx.Create(sqliteRecord).Error; err != nil {
 		return 0, fmt.Errorf("failed to add record to SQLite search database: %w", err)
 	}
 
-	logger.Debug("Added record to SQLite search database", "record_id", record.ID)
+	logger.Debug("Added record to SQLite search database", "record_id", sqliteRecord.ID)
 
-	return record.ID, nil
+	return sqliteRecord.ID, nil
 }
 
-func (d *DB) AddRecord(record types.RecordObject) error {
+func (d *DB) AddRecord(record types.Record) error {
 	err := d.gormDB.Transaction(func(tx *gorm.DB) error {
 		id, err := d.addRecordTx(tx, record)
 		if err != nil {
 			return fmt.Errorf("failed to add record to search index: %w", err)
 		}
 
-		for _, extension := range record.GetExtensionObjects() {
+		recordData := record.GetRecordData()
+
+		for _, extension := range recordData.GetExtensions() {
 			if _, err = d.addExtensionTx(tx, extension, id); err != nil {
 				return fmt.Errorf("failed to add extension to search index: %w", err)
 			}
 		}
 
-		for _, locator := range record.GetLocatorObjects() {
+		for _, locator := range recordData.GetLocators() {
 			if _, err = d.addLocatorTx(tx, locator, id); err != nil {
 				return fmt.Errorf("failed to add locator to search index: %w", err)
 			}
 		}
 
-		for _, skill := range record.GetSkillObjects() {
+		for _, skill := range recordData.GetSkills() {
 			if _, err = d.addSkillTx(tx, skill, id); err != nil {
 				return fmt.Errorf("failed to add skill to search index: %w", err)
 			}
@@ -112,7 +160,7 @@ func (d *DB) AddRecord(record types.RecordObject) error {
 }
 
 // GetRecords retrieves agent records based on the provided options.
-func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.RecordObject, error) { //nolint:cyclop
+func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.Record, error) { //nolint:cyclop
 	// Create default configuration.
 	cfg := &types.RecordFilters{}
 
@@ -191,8 +239,8 @@ func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.RecordObject, error
 		return nil, fmt.Errorf("failed to query records: %w", err)
 	}
 
-	// Convert to RecordObject interfaces.
-	result := make([]types.RecordObject, len(dbRecords))
+	// Convert to Record interfaces.
+	result := make([]types.Record, len(dbRecords))
 	for i := range dbRecords {
 		result[i] = &dbRecords[i]
 	}

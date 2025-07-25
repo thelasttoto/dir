@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
 	"github.com/spf13/cobra"
@@ -25,10 +25,6 @@ Usage examples:
 1. Pull by digest and output
 
 	dirctl pull <digest>
-
-2. In combination with other commands such as build and push:
-
-	dirctl pull $(dirctl build | dirctl push --stdin)
 
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,35 +43,48 @@ func runCommand(cmd *cobra.Command, digest string) error {
 		return errors.New("failed to get client from context")
 	}
 
-	// Fetch object from store
-	reader, err := c.Pull(cmd.Context(), &coretypes.ObjectRef{
-		Digest:      digest,
-		Type:        coretypes.ObjectType_OBJECT_TYPE_AGENT.String(),
-		Annotations: nil,
+	// Fetch record from store
+	record, err := c.Pull(cmd.Context(), &corev1.RecordRef{
+		Cid: digest, // Use digest as CID directly
 	})
 	if err != nil {
 		return fmt.Errorf("failed to pull data: %w", err)
 	}
 
-	// Load into an Agent struct for validation only
-	agent := &coretypes.Agent{}
+	// Extract the OASF object from the Record based on version
+	var oasfData interface{}
 
-	agentRaw, err := agent.LoadFromReader(reader)
+	var rawData []byte
+
+	switch data := record.GetData().(type) {
+	case *corev1.Record_V1:
+		oasfData = data.V1
+		rawData, err = json.Marshal(data.V1)
+	case *corev1.Record_V2:
+		oasfData = data.V2
+		rawData, err = json.Marshal(data.V2)
+	case *corev1.Record_V3:
+		oasfData = data.V3
+		rawData, err = json.Marshal(data.V3)
+	default:
+		return errors.New("unsupported record type")
+	}
+
 	if err != nil {
-		return fmt.Errorf("failed to load agent from reader: %w", err)
+		return fmt.Errorf("failed to marshal OASF object: %w", err)
 	}
 
 	// If raw format flag is set, print and exit
 	if opts.FormatRaw {
-		presenter.Print(cmd, string(agentRaw))
+		presenter.Print(cmd, string(rawData))
 
 		return nil
 	}
 
-	// Pretty-print the agent
-	output, err := json.MarshalIndent(&agent, "", "  ")
+	// Pretty-print the OASF object
+	output, err := json.MarshalIndent(oasfData, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal agent to JSON: %w", err)
+		return fmt.Errorf("failed to marshal OASF object to JSON: %w", err)
 	}
 
 	presenter.Print(cmd, string(output))

@@ -26,12 +26,3 @@ func GetReader(fpath string, fromStdin bool) (io.ReadCloser, error) {
 
 	return os.Stdin, nil
 }
-
-func GetAgentBytes(reader io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read data: %w", err)
-	}
-
-	return data, nil
-}

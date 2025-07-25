@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"sort"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	objectsv1 "github.com/agntcy/dir/api/objects/v1"
 )
 
 func Ptr[T any](v T) *T {
@@ -18,7 +18,7 @@ func Ptr[T any](v T) *T {
 
 //nolint:govet
 func compareJSONAgents(json1, json2 []byte) (bool, error) {
-	var agent1, agent2 coretypes.Agent
+	var agent1, agent2 objectsv1.Agent
 
 	// Convert to JSON
 	if err := json.Unmarshal(json1, &agent1); err != nil {
@@ -29,11 +29,11 @@ func compareJSONAgents(json1, json2 []byte) (bool, error) {
 		return false, fmt.Errorf("failed to unmarshal json: %w", err)
 	}
 
-	return compareAgents(agent1, agent2)
+	return compareAgents(&agent1, &agent2)
 }
 
 //nolint:govet
-func compareAgents(agent1, agent2 coretypes.Agent) (bool, error) {
+func compareAgents(agent1, agent2 *objectsv1.Agent) (bool, error) {
 	// Overwrite CreatedAt
 	agent1.CreatedAt = agent2.GetCreatedAt()
 
@@ -58,12 +58,12 @@ func compareAgents(agent1, agent2 coretypes.Agent) (bool, error) {
 	})
 
 	// Convert JSON
-	json1, err := json.Marshal(&agent1)
+	json1, err := json.Marshal(agent1)
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal json: %w", err)
 	}
 
-	json2, err := json.Marshal(&agent2)
+	json2, err := json.Marshal(agent2)
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal json: %w", err)
 	}

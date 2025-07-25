@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
-	routingtypes "github.com/agntcy/dir/api/routing/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
+	routingtypes "github.com/agntcy/dir/api/routing/v1alpha2"
 	"github.com/agntcy/dir/server/routing/internal/p2p"
 	"github.com/agntcy/dir/server/routing/rpc"
 	"github.com/agntcy/dir/server/types"
 	"github.com/agntcy/dir/utils/logging"
+	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/providers"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -109,21 +110,33 @@ func newRemote(ctx context.Context,
 	return routeAPI, nil
 }
 
-func (r *routeRemote) Publish(ctx context.Context, object *coretypes.Object, _ bool) error {
-	remoteLogger.Debug("Called remote routing's Publish method", "object", object)
+func (r *routeRemote) hasPeersInRoutingTable() bool {
+	// Check if we have any peers in the DHT routing table
+	rt := r.server.DHT().RoutingTable()
 
-	ref := object.GetRef()
+	return rt.Size() > 0
+}
 
-	// get object CID
-	cid, err := ref.GetCID()
+func (r *routeRemote) Publish(ctx context.Context, ref *corev1.RecordRef, record *corev1.Record) error {
+	remoteLogger.Debug("Called remote routing's Publish method", "ref", ref, "record", record)
+
+	// Check if we have peers connected for DHT operations i.e. if directory running in network mode.
+	if !r.hasPeersInRoutingTable() {
+		remoteLogger.Debug("No peers in DHT routing table, returning empty channel")
+
+		return nil
+	}
+
+	// get record CID
+	decodedCID, err := cid.Decode(ref.GetCid())
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "failed to get object CID: %v", err)
+		return status.Errorf(codes.InvalidArgument, "failed to parse CID: %v", err)
 	}
 
 	// announce to DHT
-	err = r.server.DHT().Provide(ctx, cid, true)
+	err = r.server.DHT().Provide(ctx, decodedCID, true)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to announce object %v, it will be retried in the background. Reason: %v", ref.GetDigest(), err)
+		return status.Errorf(codes.Internal, "failed to announce object %v, it will be retried in the background. Reason: %v", ref.GetCid(), err)
 	}
 
 	remoteLogger.Debug("Successfully announced object to the network", "ref", ref)
@@ -131,17 +144,30 @@ func (r *routeRemote) Publish(ctx context.Context, object *coretypes.Object, _ b
 	return nil
 }
 
-//nolint:mnd
-func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (<-chan *routingtypes.ListResponse_Item, error) {
+//nolint:mnd,cyclop
+func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (<-chan *routingtypes.LegacyListResponse_Item, error) {
 	remoteLogger.Debug("Called remote routing's List method", "req", req)
+
+	// Check if we have peers connected for DHT operations i.e. if directory running in network mode.
+	if !r.hasPeersInRoutingTable() {
+		remoteLogger.Debug("No peers in DHT routing table, returning empty channel")
+
+		// Return empty channel
+		emptyCh := make(chan *routingtypes.LegacyListResponse_Item)
+		close(emptyCh)
+
+		return emptyCh, nil
+	}
 
 	// list data from remote for a given peer.
 	// this returns all the records that fully match our query.
-	if req.GetPeer() != nil {
+	if req.GetLegacyListRequest().GetPeer() != nil {
 		remoteLogger.Info("Listing data for peer", "req", req)
 
-		resp, err := r.service.List(ctx, []peer.ID{peer.ID(req.GetPeer().GetId())}, &routingtypes.ListRequest{
-			Labels: req.GetLabels(),
+		resp, err := r.service.List(ctx, []peer.ID{peer.ID(req.GetLegacyListRequest().GetPeer().GetId())}, &routingtypes.ListRequest{
+			LegacyListRequest: &routingtypes.LegacyListRequest{
+				Labels: req.GetLegacyListRequest().GetLabels(),
+			},
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list data on remote: %v", err)
@@ -150,46 +176,45 @@ func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (
 		return resp, nil
 	}
 
-	// get specific agent from all remote peers hosting it
-	// this returns all the peers that are holding requested agent
-	if record := req.GetRecord(); record != nil {
-		remoteLogger.Info("Listing data for record", "record", record)
+	// get specific record from all remote peers hosting it
+	// this returns all the peers that are holding requested record
+	if ref := req.GetLegacyListRequest().GetRef(); ref != nil {
+		remoteLogger.Info("Listing data for record", "ref", ref)
 
-		// get object CID
-		cid, err := record.GetCID()
+		// get record CID
+		decodedCID, err := cid.Decode(ref.GetCid())
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to get object CID: %v", err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to parse CID: %v", err)
 		}
 
 		// find using the DHT
-		provs, err := r.server.DHT().FindProviders(ctx, cid)
+		provs, err := r.server.DHT().FindProviders(ctx, decodedCID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to find object providers: %v", err)
 		}
 
 		if len(provs) == 0 {
-			return nil, status.Errorf(codes.NotFound, "no providers found for object: %s", record.GetDigest())
+			return nil, status.Errorf(codes.NotFound, "no providers found for object: %s", ref.GetCid())
 		}
 
 		// stream results back
-		resCh := make(chan *routingtypes.ListResponse_Item, 100)
-		go func(provs []peer.AddrInfo, ref *coretypes.ObjectRef) {
+		resCh := make(chan *routingtypes.LegacyListResponse_Item, 100)
+		go func(provs []peer.AddrInfo, ref *corev1.RecordRef) {
 			defer close(resCh)
 
 			for _, prov := range provs {
-				// pull agent from peer
+				// pull record from peer
 				// TODO: this is not optional because we pull everything
 				// just for the sake of showing the result
-				object, err := r.service.Pull(ctx, prov.ID, ref)
+				record, err := r.service.Pull(ctx, prov.ID, ref)
 				if err != nil {
-					remoteLogger.Error("failed to pull agent", "error", err)
+					remoteLogger.Error("failed to pull record", "error", err)
 
 					continue
 				}
 
-				// get agent
-				agent := object.GetAgent()
-				labels := getLabels(&coretypes.Agent{Agent: agent})
+				// get record
+				labels := getLabels(record)
 
 				// peer addrs to string
 				var addrs []string
@@ -197,11 +222,11 @@ func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (
 					addrs = append(addrs, addr.String())
 				}
 
-				remoteLogger.Info("Found an announced agent", "ref", ref, "peer", prov.ID, "labels", strings.Join(labels, ", "), "addrs", strings.Join(addrs, ", "))
+				remoteLogger.Info("Found an announced record", "ref", ref, "peer", prov.ID, "labels", strings.Join(labels, ", "), "addrs", strings.Join(addrs, ", "))
 
 				// send back to caller
-				resCh <- &routingtypes.ListResponse_Item{
-					Record: object.GetRef(),
+				resCh <- &routingtypes.LegacyListResponse_Item{
+					Ref:    ref,
 					Labels: labels,
 					Peer: &routingtypes.Peer{
 						Id:    prov.ID.String(),
@@ -209,7 +234,7 @@ func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (
 					},
 				}
 			}
-		}(provs, record)
+		}(provs, ref)
 
 		return resCh, nil
 	}
@@ -219,27 +244,28 @@ func (r *routeRemote) List(ctx context.Context, req *routingtypes.ListRequest) (
 	remoteLogger.Info("Listing data for all peers", "req", req)
 
 	// resolve hops
-	if req.GetMaxHops() > 20 {
+	if req.GetLegacyListRequest().GetMaxHops() > 20 {
 		return nil, errors.New("max hops exceeded")
 	}
 
 	//nolint:protogetter
-	if req.MaxHops != nil && *req.MaxHops > 0 {
-		*req.MaxHops--
+	if req.LegacyListRequest.MaxHops != nil && *req.LegacyListRequest.MaxHops > 0 {
+		*req.LegacyListRequest.MaxHops--
 	}
 
 	// run in the background
-	resCh := make(chan *routingtypes.ListResponse_Item, 100)
+	resCh := make(chan *routingtypes.LegacyListResponse_Item, 100)
 	go func(ctx context.Context, req *routingtypes.ListRequest) {
 		defer close(resCh)
 
 		// get data from peers (list what each of our connected peers has)
 		resp, err := r.service.List(ctx, r.server.Host().Peerstore().Peers(), &routingtypes.ListRequest{
-			Peer:    req.GetPeer(),
-			Labels:  req.GetLabels(),
-			Record:  req.GetRecord(),
-			MaxHops: req.MaxHops, //nolint:protogetter
-			Network: toPtr(false),
+			LegacyListRequest: &routingtypes.LegacyListRequest{
+				Peer:    req.GetLegacyListRequest().GetPeer(),
+				Labels:  req.GetLegacyListRequest().GetLabels(),
+				Ref:     req.GetLegacyListRequest().GetRef(),
+				MaxHops: req.LegacyListRequest.MaxHops, //nolint:protogetter
+			},
 		})
 		if err != nil {
 			remoteLogger.Error("failed to list from peer over the network", "error", err)
@@ -271,44 +297,43 @@ procLoop:
 			return
 		case notif := <-r.notifyCh:
 
-			// check if we have this agent locally
+			// check if we have this record locally
 			_, err := r.storeAPI.Lookup(ctx, notif.Ref)
 			if err != nil {
-				remoteLogger.Error("failed to check if agent exists locally", "error", err)
+				remoteLogger.Error("failed to check if record exists locally", "error", err)
 
 				continue procLoop
 			}
 
-			// TODO: we should subscribe to some agents so we can create a local copy
-			// of the agent and its skills.
+			// TODO: we should subscribe to some records so we can create a local copy
+			// of the record and its skills.
 			// for now, we are only testing if we can reach out and fetch it from the
 			// broadcasting node
 
 			// lookup from remote
 			meta, err := r.service.Lookup(ctx, notif.Peer.ID, notif.Ref)
 			if err != nil {
-				remoteLogger.Error("failed to lookup agent", "error", err)
+				remoteLogger.Error("failed to lookup record", "error", err)
 
 				continue procLoop
 			}
 
 			// fetch model directly from peer and drop it
-			object, err := r.service.Pull(ctx, notif.Peer.ID, notif.Ref)
+			record, err := r.service.Pull(ctx, notif.Peer.ID, notif.Ref)
 			if err != nil {
-				remoteLogger.Error("failed to pull agent", "error", err)
+				remoteLogger.Error("failed to pull record", "error", err)
 
 				continue procLoop
 			}
-			agent := object.GetAgent()
 
 			// extract labels
-			labels := getLabels(&coretypes.Agent{Agent: agent})
+			labels := getLabels(record)
 
 			// TODO: we can perform validation and data synchronization here.
 			// Depending on the server configuration, we can decide if we want to
 			// pull this model into our own cache, rebroadcast it, or ignore it.
 
-			remoteLogger.Info("Successfully processed agent", "meta", meta, "labels", strings.Join(labels, ", "), "peer", notif.Peer.ID)
+			remoteLogger.Info("Successfully processed record", "meta", meta, "labels", strings.Join(labels, ", "), "peer", notif.Peer.ID)
 		}
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
 	"github.com/spf13/cobra"
@@ -41,8 +41,8 @@ func runCommand(cmd *cobra.Command, digest string) error {
 	}
 
 	// Fetch info from store
-	info, err := c.Lookup(cmd.Context(), &coretypes.ObjectRef{
-		Digest: digest,
+	info, err := c.Lookup(cmd.Context(), &corev1.RecordRef{
+		Cid: digest, // Use digest as CID directly
 	})
 	if err != nil {
 		return fmt.Errorf("failed to pull data: %w", err)

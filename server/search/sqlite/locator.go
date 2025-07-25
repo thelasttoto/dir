@@ -17,26 +17,41 @@ type Locator struct {
 	URL     string `gorm:"not null"`
 }
 
+func (locator *Locator) GetAnnotations() map[string]string {
+	// SQLite locators don't store annotations, return empty map
+	return make(map[string]string)
+}
+
 func (locator *Locator) GetType() string {
 	return locator.Type
 }
 
-func (locator *Locator) GetUrl() string { //nolint:revive,stylecheck
+func (locator *Locator) GetURL() string {
 	return locator.URL
 }
 
-func (d *DB) addLocatorTx(tx *gorm.DB, locatorObject types.LocatorObject, agentID uint) (uint, error) {
-	locator := &Locator{
+func (locator *Locator) GetSize() uint64 {
+	// SQLite locators don't store size information
+	return 0
+}
+
+func (locator *Locator) GetDigest() string {
+	// SQLite locators don't store digest information
+	return ""
+}
+
+func (d *DB) addLocatorTx(tx *gorm.DB, locator types.Locator, agentID uint) (uint, error) {
+	sqliteLocator := &Locator{
 		AgentID: agentID,
-		Type:    locatorObject.GetType(),
-		URL:     locatorObject.GetUrl(),
+		Type:    locator.GetType(),
+		URL:     locator.GetURL(),
 	}
 
-	if err := tx.Create(locator).Error; err != nil {
+	if err := tx.Create(sqliteLocator).Error; err != nil {
 		return 0, fmt.Errorf("failed to add locator to SQLite search database: %w", err)
 	}
 
-	logger.Debug("Added locator to SQLite search database", "agent_id", agentID, "locator_id", locator.ID)
+	logger.Debug("Added locator to SQLite search database", "agent_id", agentID, "locator_id", sqliteLocator.ID)
 
-	return locator.ID, nil
+	return sqliteLocator.ID, nil
 }

@@ -5,32 +5,34 @@
 package routing
 
 import (
-	"bytes"
-	"encoding/json"
 	"testing"
 	"time"
 
-	objectsv1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v1"
-	coretypes "github.com/agntcy/dir/api/core/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
+	objectsv1 "github.com/agntcy/dir/api/objects/v1"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 )
 
 // Testing 2 nodes, A -> B
-// stores and announces an agent.
+// stores and announces an record.
 // A discovers it retrieves the key metadata from B.
 func TestHandler(t *testing.T) {
 	// Test data
-	testAgent := &coretypes.Agent{
-		Agent: &objectsv1.Agent{
-			Skills: []*objectsv1.Skill{
-				{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-			},
-			Locators: []*objectsv1.Locator{
-				{Type: "type1", Url: "url1"},
+	testRecord := &corev1.Record{
+		Data: &corev1.Record_V1{
+			V1: &objectsv1.Agent{
+				Name: "test-handler-agent",
+				Skills: []*objectsv1.Skill{
+					{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
+				},
+				Locators: []*objectsv1.Locator{
+					{Type: "type1", Url: "url1"},
+				},
 			},
 		},
 	}
-	testRef := getObjectRef(testAgent)
+	testRef := &corev1.RecordRef{Cid: testRecord.GetCid()}
 
 	// create demo network
 	firstNode := newTestServer(t, t.Context(), nil)
@@ -42,17 +44,16 @@ func TestHandler(t *testing.T) {
 	<-secondNode.remote.server.DHT().RefreshRoutingTable()
 
 	// publish the key on second node and wait on the first
-	digestCID, err := testRef.GetCID()
+	cidStr := testRef.GetCid()
+	decodedCID, err := cid.Decode(cidStr)
 	assert.NoError(t, err)
 
 	// push the data
-	data, err := json.Marshal(testAgent)
-	assert.NoError(t, err)
-	_, err = secondNode.remote.storeAPI.Push(t.Context(), testRef, bytes.NewReader(data))
+	_, err = secondNode.remote.storeAPI.Push(t.Context(), testRecord)
 	assert.NoError(t, err)
 
 	// announce the key
-	err = secondNode.remote.server.DHT().Provide(t.Context(), digestCID, true)
+	err = secondNode.remote.server.DHT().Provide(t.Context(), decodedCID, true)
 	assert.NoError(t, err)
 
 	// wait for sync
@@ -63,7 +64,7 @@ func TestHandler(t *testing.T) {
 	// check on first
 	found := false
 
-	peerCh := firstNode.remote.server.DHT().FindProvidersAsync(t.Context(), digestCID, 1)
+	peerCh := firstNode.remote.server.DHT().FindProvidersAsync(t.Context(), decodedCID, 1)
 	for peer := range peerCh {
 		if peer.ID == secondNode.remote.server.Host().ID() {
 			found = true
