@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package saas.v1alpha1;
+
+option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "saas/v1alpha1/agent.proto";
+import "saas/v1alpha1/category.proto";
+
+message Repository {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+
+  string name = 4 [
+    (buf.validate.field).string.pattern = "^[a-z0-9_-]+(/[a-z0-9_-]+)*$",
+    (buf.validate.field).string.max_len = 100
+  ];
+  string description = 5 [(buf.validate.field).string.max_len = 350];
+  uint32 stars = 6;
+  uint32 downloads = 7;
+  string verification_type = 8 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9 ]*$"];
+  string user_id = 9;
+  string tenant_id = 10;
+  bool private = 11;
+
+  repeated Agent agents = 12;
+  repeated Category categories = 13;
+
+  option (buf.validate.message).cel = {
+    id: "updated_at.not_less_than.created_at"
+    message: "updated_at should be equal or more than created_at"
+    expression: "this.updated_at >= this.created_at"
+  };
+}

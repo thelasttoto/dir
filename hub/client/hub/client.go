@@ -14,7 +14,8 @@ import (
 	"io"
 
 	corev1alpha1 "github.com/agntcy/dir/api/core/v1alpha1"
-	"github.com/agntcy/dir/hub/api/v1alpha1"
+	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
+	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -28,6 +29,10 @@ type Client interface {
 	PushAgent(ctx context.Context, agent []byte, repositoryID any) (*v1alpha1.PushAgentResponse, error)
 	// PullAgent downloads an agent from the hub and returns the agent data or an error.
 	PullAgent(ctx context.Context, request *v1alpha1.PullAgentRequest) ([]byte, error)
+	// CreateAPIKey creates an API key for the specified role and returns the (clientId, secret) or an error.
+	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string) (*v1alpha1.CreateApiKeyResponse, error)
+	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
+	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error)
 }
 
 // client implements the Client interface for the Agent Hub backend.
@@ -141,4 +146,46 @@ func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullAgentReque
 	}
 
 	return buffer.Bytes(), nil
+}
+
+func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string) (*v1alpha1.CreateApiKeyResponse, error) {
+	roleValue, ok := v1alpha1.ProductRole_value[roleName]
+	if !ok {
+		return nil, fmt.Errorf("Unknown role: %w", roleValue)
+	}
+	req := &v1alpha1.CreateApiKeyRequest{
+		Role: v1alpha1.ProductRole(roleValue),
+	}
+
+	stream, err := c.AgentDirServiceClient.CreateAPIKey(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create API key: %w", err)
+	}
+
+	var chunk *v1alpha1.CreateApiKeyResponse
+
+	chunk, err = stream.Recv()
+	if errors.Is(err, io.EOF) {
+		// Not an error
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to receive chunk: %w", err)
+	}
+
+	return chunk, nil
+}
+
+func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error) {
+	req := &v1alpha1.DeleteApiKeyRequest{
+		Id: apikeyId,
+	}
+
+	resp, err := c.AgentDirServiceClient.DeleteAPIKey(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete API key: %w", err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("received nil response from delete api key")
+	}
+
+	return resp, nil
 }
