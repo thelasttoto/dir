@@ -1,7 +1,7 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha2
+package controller
 
 import (
 	"fmt"
@@ -13,29 +13,29 @@ import (
 	"github.com/agntcy/dir/utils/logging"
 )
 
-var logger = logging.Logger("controller/search")
+var searchLogger = logging.Logger("controller/search")
 
 type searchCtlr struct {
 	searchtypes.UnimplementedSearchServiceServer
-	search types.SearchAPI
+	db types.DatabaseAPI
 }
 
-func NewSearchController(search types.SearchAPI) searchtypes.SearchServiceServer {
+func NewSearchController(db types.DatabaseAPI) searchtypes.SearchServiceServer {
 	return &searchCtlr{
 		UnimplementedSearchServiceServer: searchtypes.UnimplementedSearchServiceServer{},
-		search:                           search,
+		db:                               db,
 	}
 }
 
 func (c *searchCtlr) Search(req *searchtypes.SearchRequest, srv searchtypes.SearchService_SearchServer) error {
-	logger.Debug("Called search controller's Search method", "req", req)
+	searchLogger.Debug("Called search controller's Search method", "req", req)
 
 	filterOptions, err := queryToFilters(req)
 	if err != nil {
 		return fmt.Errorf("failed to create filter options: %w", err)
 	}
 
-	records, err := c.search.GetRecords(filterOptions...)
+	records, err := c.db.GetRecords(filterOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to get records: %w", err)
 	}
@@ -58,7 +58,7 @@ func queryToFilters(req *searchtypes.SearchRequest) ([]types.FilterOption, error
 	for _, query := range req.GetQueries() {
 		switch query.GetType() {
 		case searchtypes.RecordQueryType_RECORD_QUERY_TYPE_UNSPECIFIED:
-			logger.Warn("Unspecified query type, skipping", "query", query)
+			searchLogger.Warn("Unspecified query type, skipping", "query", query)
 
 		case searchtypes.RecordQueryType_RECORD_QUERY_TYPE_NAME:
 			params = append(params, types.WithName(query.GetValue()))
@@ -116,7 +116,7 @@ func queryToFilters(req *searchtypes.SearchRequest) ([]types.FilterOption, error
 			}
 
 		default:
-			logger.Warn("Unknown query type", "type", query.GetType())
+			searchLogger.Warn("Unknown query type", "type", query.GetType())
 		}
 	}
 

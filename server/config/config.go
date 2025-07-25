@@ -8,11 +8,12 @@ import (
 	"fmt"
 	"strings"
 
+	database "github.com/agntcy/dir/server/database/config"
+	sqliteconfig "github.com/agntcy/dir/server/database/sqlite/config"
 	routing "github.com/agntcy/dir/server/routing/config"
-	search "github.com/agntcy/dir/server/search/config"
-	sqliteconfig "github.com/agntcy/dir/server/search/sqlite/config"
 	localfs "github.com/agntcy/dir/server/store/localfs/config"
 	oci "github.com/agntcy/dir/server/store/oci/config"
+	sync "github.com/agntcy/dir/server/sync/config"
 	"github.com/agntcy/dir/utils/logging"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
@@ -50,8 +51,11 @@ type Config struct {
 	// Routing configuration
 	Routing routing.Config `json:"routing,omitempty" mapstructure:"routing"`
 
-	// Search configuration
-	Search search.Config `json:"search,omitempty" mapstructure:"search"`
+	// Database configuration
+	Database database.Config `json:"database,omitempty" mapstructure:"database"`
+
+	// Sync configuration
+	Sync sync.Config `json:"sync,omitempty" mapstructure:"sync"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -138,13 +142,26 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("routing.datastore_dir", "")
 
 	//
-	// Search configuration
+	// Database configuration
 	//
-	_ = v.BindEnv("search.db_type")
-	v.SetDefault("search.db_type", search.DefaultDBType)
+	_ = v.BindEnv("database.db_type")
+	v.SetDefault("database.db_type", database.DefaultDBType)
 
-	_ = v.BindEnv("search.sqlite.db_path")
-	v.SetDefault("search.sqlite.db_path", sqliteconfig.DefaultSQLiteDBPath)
+	_ = v.BindEnv("database.sqlite.db_path")
+	v.SetDefault("database.sqlite.db_path", sqliteconfig.DefaultSQLiteDBPath)
+
+	//
+	// Sync configuration
+	//
+
+	_ = v.BindEnv("sync.scheduler_interval")
+	v.SetDefault("sync.scheduler_interval", sync.DefaultSyncSchedulerInterval)
+
+	_ = v.BindEnv("sync.worker_count")
+	v.SetDefault("sync.worker_count", sync.DefaultSyncWorkerCount)
+
+	_ = v.BindEnv("sync.worker_timeout")
+	v.SetDefault("sync.worker_timeout", sync.DefaultSyncWorkerTimeout)
 
 	// Load configuration into struct
 	decodeHooks := mapstructure.ComposeDecodeHookFunc(

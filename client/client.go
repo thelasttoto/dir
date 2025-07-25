@@ -17,6 +17,7 @@ type Client struct {
 	storetypes.StoreServiceClient
 	routingtypes.RoutingServiceClient
 	searchtypesv1alpha2.SearchServiceClient
+	storetypes.SyncServiceClient
 }
 
 type options struct {
@@ -64,5 +65,6 @@ func New(opts ...Option) (*Client, error) {
 		StoreServiceClient:   storetypes.NewStoreServiceClient(client),
 		RoutingServiceClient: routingtypes.NewRoutingServiceClient(client),
 		SearchServiceClient:  searchtypesv1alpha2.NewSearchServiceClient(client),
+		SyncServiceClient:    storetypes.NewSyncServiceClient(client),
 	}, nil
 }
