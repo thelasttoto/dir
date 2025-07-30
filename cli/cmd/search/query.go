@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	searchtypesv1alpha2 "github.com/agntcy/dir/api/search/v1alpha2"
+	searchv1 "github.com/agntcy/dir/api/search/v1"
 )
 
 type Query []string
@@ -38,7 +38,7 @@ func (q *Query) Set(value string) error {
 
 	validQueryType := false
 
-	for _, queryType := range searchtypesv1alpha2.ValidQueryTypes {
+	for _, queryType := range searchv1.ValidQueryTypes {
 		if parts[0] == queryType {
 			validQueryType = true
 
@@ -50,7 +50,7 @@ func (q *Query) Set(value string) error {
 		return fmt.Errorf(
 			"invalid query type: %s, valid types are: %v",
 			parts[0],
-			strings.Join(searchtypesv1alpha2.ValidQueryTypes, ", "),
+			strings.Join(searchv1.ValidQueryTypes, ", "),
 		)
 	}
 
@@ -63,14 +63,14 @@ func (q *Query) Type() string {
 	return "query"
 }
 
-func (q *Query) ToAPIQueries() []*searchtypesv1alpha2.RecordQuery {
-	queries := []*searchtypesv1alpha2.RecordQuery{}
+func (q *Query) ToAPIQueries() []*searchv1.RecordQuery {
+	queries := []*searchv1.RecordQuery{}
 
 	for _, item := range *q {
 		parts := strings.SplitN(item, "=", 2)
 
-		queries = append(queries, &searchtypesv1alpha2.RecordQuery{
-			Type:  searchtypesv1alpha2.RecordQueryType(searchtypesv1alpha2.RecordQueryType_value[parts[0]]),
+		queries = append(queries, &searchv1.RecordQuery{
+			Type:  searchv1.RecordQueryType(searchv1.RecordQueryType_value[parts[0]]),
 			Value: parts[1],
 		})
 	}

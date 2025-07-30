@@ -4,7 +4,7 @@
 package sqlite
 
 import (
-	storev1alpha2 "github.com/agntcy/dir/api/store/v1alpha2"
+	storev1 "github.com/agntcy/dir/api/store/v1"
 	"github.com/agntcy/dir/server/types"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -12,10 +12,10 @@ import (
 
 type Sync struct {
 	gorm.Model
-	ID                 string                   `gorm:"not null;index"`
-	RemoteDirectoryURL string                   `gorm:"not null"`
-	RemoteRegistryURL  string                   `gorm:"not null"`
-	Status             storev1alpha2.SyncStatus `gorm:"not null"`
+	ID                 string             `gorm:"not null;index"`
+	RemoteDirectoryURL string             `gorm:"not null"`
+	RemoteRegistryURL  string             `gorm:"not null"`
+	Status             storev1.SyncStatus `gorm:"not null"`
 }
 
 func (sync *Sync) GetID() string {
@@ -30,7 +30,7 @@ func (sync *Sync) GetRemoteRegistryURL() string {
 	return sync.RemoteRegistryURL
 }
 
-func (sync *Sync) GetStatus() storev1alpha2.SyncStatus {
+func (sync *Sync) GetStatus() storev1.SyncStatus {
 	return sync.Status
 }
 
@@ -38,7 +38,7 @@ func (d *DB) CreateSync(remoteURL string) (string, error) {
 	sync := &Sync{
 		ID:                 uuid.NewString(),
 		RemoteDirectoryURL: remoteURL,
-		Status:             storev1alpha2.SyncStatus_SYNC_STATUS_PENDING,
+		Status:             storev1.SyncStatus_SYNC_STATUS_PENDING,
 	}
 
 	if err := d.gormDB.Create(sync).Error; err != nil {
@@ -82,7 +82,7 @@ func (d *DB) GetSyncs(offset, limit int) ([]types.SyncObject, error) {
 	return syncObjects, nil
 }
 
-func (d *DB) GetSyncsByStatus(status storev1alpha2.SyncStatus) ([]types.SyncObject, error) {
+func (d *DB) GetSyncsByStatus(status storev1.SyncStatus) ([]types.SyncObject, error) {
 	var syncs []Sync
 	if err := d.gormDB.Where("status = ?", status).Find(&syncs).Error; err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (d *DB) GetSyncsByStatus(status storev1alpha2.SyncStatus) ([]types.SyncObje
 	return syncObjects, nil
 }
 
-func (d *DB) UpdateSyncStatus(syncID string, status storev1alpha2.SyncStatus) error {
+func (d *DB) UpdateSyncStatus(syncID string, status storev1.SyncStatus) error {
 	syncObj, err := d.GetSyncByID(syncID)
 	if err != nil {
 		return err
