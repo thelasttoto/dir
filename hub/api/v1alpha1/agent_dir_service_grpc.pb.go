@@ -19,10 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	AgentDirService_PushAgent_FullMethodName    = "/saas.v1alpha1.AgentDirService/PushAgent"
-	AgentDirService_PullAgent_FullMethodName    = "/saas.v1alpha1.AgentDirService/PullAgent"
-	AgentDirService_CreateAPIKey_FullMethodName = "/saas.v1alpha1.AgentDirService/CreateAPIKey"
-	AgentDirService_DeleteAPIKey_FullMethodName = "/saas.v1alpha1.AgentDirService/DeleteAPIKey"
+	AgentDirService_PushAgent_FullMethodName = "/saas.v1alpha1.AgentDirService/PushAgent"
+	AgentDirService_PullAgent_FullMethodName = "/saas.v1alpha1.AgentDirService/PullAgent"
 )
 
 // AgentDirServiceClient is the client API for AgentDirService service.
@@ -33,8 +31,6 @@ const (
 type AgentDirServiceClient interface {
 	PushAgent(ctx context.Context, opts ...grpc.CallOption) (AgentDirService_PushAgentClient, error)
 	PullAgent(ctx context.Context, in *PullAgentRequest, opts ...grpc.CallOption) (AgentDirService_PullAgentClient, error)
-	CreateAPIKey(ctx context.Context, in *CreateApiKeyRequest, opts ...grpc.CallOption) (AgentDirService_CreateAPIKeyClient, error)
-	DeleteAPIKey(ctx context.Context, in *DeleteApiKeyRequest, opts ...grpc.CallOption) (*DeleteApiKeyResponse, error)
 }
 
 type agentDirServiceClient struct {
@@ -113,49 +109,6 @@ func (x *agentDirServicePullAgentClient) Recv() (*PullAgentResponse, error) {
 	return m, nil
 }
 
-func (c *agentDirServiceClient) CreateAPIKey(ctx context.Context, in *CreateApiKeyRequest, opts ...grpc.CallOption) (AgentDirService_CreateAPIKeyClient, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AgentDirService_ServiceDesc.Streams[2], AgentDirService_CreateAPIKey_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &agentDirServiceCreateAPIKeyClient{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type AgentDirService_CreateAPIKeyClient interface {
-	Recv() (*CreateApiKeyResponse, error)
-	grpc.ClientStream
-}
-
-type agentDirServiceCreateAPIKeyClient struct {
-	grpc.ClientStream
-}
-
-func (x *agentDirServiceCreateAPIKeyClient) Recv() (*CreateApiKeyResponse, error) {
-	m := new(CreateApiKeyResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *agentDirServiceClient) DeleteAPIKey(ctx context.Context, in *DeleteApiKeyRequest, opts ...grpc.CallOption) (*DeleteApiKeyResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteApiKeyResponse)
-	err := c.cc.Invoke(ctx, AgentDirService_DeleteAPIKey_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AgentDirServiceServer is the server API for AgentDirService service.
 // All implementations should embed UnimplementedAgentDirServiceServer
 // for forward compatibility.
@@ -164,8 +117,6 @@ func (c *agentDirServiceClient) DeleteAPIKey(ctx context.Context, in *DeleteApiK
 type AgentDirServiceServer interface {
 	PushAgent(AgentDirService_PushAgentServer) error
 	PullAgent(*PullAgentRequest, AgentDirService_PullAgentServer) error
-	CreateAPIKey(*CreateApiKeyRequest, AgentDirService_CreateAPIKeyServer) error
-	DeleteAPIKey(context.Context, *DeleteApiKeyRequest) (*DeleteApiKeyResponse, error)
 }
 
 // UnimplementedAgentDirServiceServer should be embedded to have
@@ -180,12 +131,6 @@ func (UnimplementedAgentDirServiceServer) PushAgent(AgentDirService_PushAgentSer
 }
 func (UnimplementedAgentDirServiceServer) PullAgent(*PullAgentRequest, AgentDirService_PullAgentServer) error {
 	return status.Errorf(codes.Unimplemented, "method PullAgent not implemented")
-}
-func (UnimplementedAgentDirServiceServer) CreateAPIKey(*CreateApiKeyRequest, AgentDirService_CreateAPIKeyServer) error {
-	return status.Errorf(codes.Unimplemented, "method CreateAPIKey not implemented")
-}
-func (UnimplementedAgentDirServiceServer) DeleteAPIKey(context.Context, *DeleteApiKeyRequest) (*DeleteApiKeyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteAPIKey not implemented")
 }
 func (UnimplementedAgentDirServiceServer) testEmbeddedByValue() {}
 
@@ -254,57 +199,13 @@ func (x *agentDirServicePullAgentServer) Send(m *PullAgentResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _AgentDirService_CreateAPIKey_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(CreateApiKeyRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(AgentDirServiceServer).CreateAPIKey(m, &agentDirServiceCreateAPIKeyServer{ServerStream: stream})
-}
-
-type AgentDirService_CreateAPIKeyServer interface {
-	Send(*CreateApiKeyResponse) error
-	grpc.ServerStream
-}
-
-type agentDirServiceCreateAPIKeyServer struct {
-	grpc.ServerStream
-}
-
-func (x *agentDirServiceCreateAPIKeyServer) Send(m *CreateApiKeyResponse) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func _AgentDirService_DeleteAPIKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteApiKeyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentDirServiceServer).DeleteAPIKey(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AgentDirService_DeleteAPIKey_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentDirServiceServer).DeleteAPIKey(ctx, req.(*DeleteApiKeyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // AgentDirService_ServiceDesc is the grpc.ServiceDesc for AgentDirService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AgentDirService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "saas.v1alpha1.AgentDirService",
 	HandlerType: (*AgentDirServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "DeleteAPIKey",
-			Handler:    _AgentDirService_DeleteAPIKey_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "PushAgent",
@@ -314,11 +215,6 @@ var AgentDirService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "PullAgent",
 			Handler:       _AgentDirService_PullAgent_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "CreateAPIKey",
-			Handler:       _AgentDirService_CreateAPIKey_Handler,
 			ServerStreams: true,
 		},
 	},

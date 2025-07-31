@@ -9,8 +9,6 @@ import "core/v1alpha1/object.proto";
 import "google/api/annotations.proto";
 import "saas/v1alpha1/agent_id.proto";
 import "saas/v1alpha1/agent_id_response.proto";
-import "saas/v1alpha1/apikey.proto";
-import "saas/v1alpha1/roles.proto";
 
 message PushAgentRequest {
   oneof repository {
@@ -37,20 +35,6 @@ message PullAgentResponse {
   core.v1alpha1.Object model = 1;
 }
 
-message CreateApiKeyRequest {
-  ProductRole role = 1;
-}
-
-message CreateApiKeyResponse {
-  ApiKey token = 1;
-}
-
-message DeleteApiKeyRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-}
-
-message DeleteApiKeyResponse {}
-
 // This API is manily for CLIs and the implementation of these APIs should communicate with the Agent Directory
 service AgentDirService {
   rpc PushAgent(stream PushAgentRequest) returns (PushAgentResponse) {
@@ -61,14 +45,6 @@ service AgentDirService {
   }
   rpc PullAgent(PullAgentRequest) returns (stream PullAgentResponse) {
     option (google.api.http) = {get: "/v1alpha1/agents/pull/{id.digest}"};
-  }
-
-  rpc CreateAPIKey(CreateApiKeyRequest) returns (stream CreateApiKeyResponse) {
-    option (google.api.http) = {post: "/v1alpha1/agents/apikey"};
-  }
-
-  rpc DeleteAPIKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse) {
-    option (google.api.http) = {delete: "/v1alpha1/agents/apikey/{id}"};
   }
 
 }
