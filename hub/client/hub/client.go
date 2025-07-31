@@ -38,6 +38,7 @@ type Client interface {
 // client implements the Client interface for the Agent Hub backend.
 type client struct {
 	v1alpha1.AgentDirServiceClient
+	v1alpha1.ApiKeyServiceClient
 }
 
 // New creates a new Agent Hub client for the given server address.
@@ -52,7 +53,10 @@ func New(serverAddr string) (*client, error) { //nolint:revive
 		return nil, fmt.Errorf("failed to create grpc client: %w", err)
 	}
 
-	return &client{AgentDirServiceClient: v1alpha1.NewAgentDirServiceClient(conn)}, nil
+	return &client{
+		AgentDirServiceClient: v1alpha1.NewAgentDirServiceClient(conn),
+		ApiKeyServiceClient:   v1alpha1.NewApiKeyServiceClient(conn),
+	}, nil
 }
 
 // PushAgent uploads an agent to the hub in chunks and returns the response or an error.
@@ -157,7 +161,7 @@ func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSess
 		Role: v1alpha1.ProductRole(roleValue),
 	}
 
-	stream, err := c.AgentDirServiceClient.CreateAPIKey(ctx, req)
+	stream, err := c.ApiKeyServiceClient.CreateAPIKey(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key: %w", err)
 	}
@@ -179,7 +183,7 @@ func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSess
 		Id: apikeyId,
 	}
 
-	resp, err := c.AgentDirServiceClient.DeleteAPIKey(ctx, req)
+	resp, err := c.ApiKeyServiceClient.DeleteAPIKey(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete API key: %w", err)
 	}

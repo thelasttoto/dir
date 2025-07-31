@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package saas.v1alpha1;
+
+option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
+
+import "buf/validate/validate.proto";
+import "core/v1alpha1/object.proto";
+import "google/api/annotations.proto";
+import "saas/v1alpha1/apikey.proto";
+import "saas/v1alpha1/roles.proto";
+
+message CreateApiKeyRequest {
+  ProductRole role = 1;
+}
+
+message CreateApiKeyResponse {
+  ApiKey token = 1;
+}
+
+message DeleteApiKeyRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message DeleteApiKeyResponse {}
+
+service ApiKeyService {
+  rpc CreateAPIKey(CreateApiKeyRequest) returns (stream CreateApiKeyResponse) {
+    option (google.api.http) = {post: "/v1alpha1/agents/apikey"};
+  }
+
+  rpc DeleteAPIKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse) {
+    option (google.api.http) = {delete: "/v1alpha1/agents/apikey/{id}"};
+  }
+
+}
