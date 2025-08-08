@@ -39,6 +39,8 @@ type Client interface {
 type client struct {
 	v1alpha1.AgentDirServiceClient
 	v1alpha1.ApiKeyServiceClient
+	v1alpha1.OrganizationServiceClient
+	v1alpha1.UserServiceClient
 }
 
 // New creates a new Agent Hub client for the given server address.
