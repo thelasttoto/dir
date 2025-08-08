@@ -1,14 +1,15 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-// Package orgs provides the CLI command for listing organizations (organizations) for the logged-in user.
-// The orgs command only lists organizations/organizations. To switch between organizations, use the "orgs switch" subcommand.
+// Package orgs provides the CLI commands for managing organizations.
+// The orgs command has subcommands for listing and creating organizations.
 package orgs
 
 import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 
 	saasv1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	auth "github.com/agntcy/dir/hub/auth"
@@ -26,13 +27,40 @@ const (
 	gapSize    = 4
 )
 
+// isOrganizationNameValid validates organization name against the API format and rejects UUID format
+func isOrganizationNameValid(name string) bool {
+	if name == "" {
+		return true
+	}
+
+	uuidRegex := regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	apiRegex := regexp.MustCompile(`^[a-z0-9_-]+(/[a-z0-9_-]+)*$`)
+
+	return !uuidRegex.MatchString(name) && apiRegex.MatchString(name)
+}
+
 // NewCommand creates the "orgs" command for the Agent Hub CLI.
-// It lists organizations (organizations) for the logged-in user.
+// It provides subcommands for managing organizations.
 // Returns the configured *cobra.Command.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "orgs",
 		Aliases: []string{"organizations"},
+		Short:   "Manage organizations",
+		Long:    "Manage organizations including listing and creating new organizations",
+	}
+
+	cmd.AddCommand(newListCommand(hubOpts))
+	cmd.AddCommand(newCreateCommand(hubOpts))
+
+	return cmd
+}
+
+// newListCommand creates the "orgs list" subcommand.
+func newListCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
 		Short:   "List organizations for logged in user",
 	}
 
@@ -65,14 +93,85 @@ func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	return cmd
 }
 
+// newCreateCommand creates the "orgs create" subcommand.
+func newCreateCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
+	var (
+		orgName        string
+		orgDescription string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a new organization",
+		Long: `Create a new organization with the specified name and optional description.
+
+Organization name must include only lowercase letters, digits, underscores or hyphens.
+
+Valid examples:
+  - my-org
+  - my_org  
+  - test123
+  - org_name-123
+
+Examples:
+  dirctl hub orgs create --name my-organization --description "My test organization"
+  dirctl hub orgs create --name my_org`,
+	}
+
+	cmd.Flags().StringVarP(&orgName, "name", "n", "", "Organization name (required)")
+	cmd.Flags().StringVarP(&orgDescription, "description", "d", "", "Organization description (optional)")
+	cmd.MarkFlagRequired("name")
+
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
+		currentSession, ok := ctxSession.(*sessionstore.HubSession)
+
+		if !ok || !auth.HasLoginCreds(currentSession) {
+			return errors.New("no current session found. please login first")
+		}
+
+		hc, err := hubClient.New(currentSession.HubBackendAddress)
+		if err != nil {
+			return fmt.Errorf("failed to create hub client: %w", err)
+		}
+
+		ctx := auth.AddAuthToContext(cmd.Context(), currentSession)
+
+		if !isOrganizationNameValid(orgName) {
+			return errors.New("invalid organization name format. 'name' must include only lowercase letters, digits, underscores or hyphens. Examples: my-org, my_org")
+		}
+
+		req := &saasv1alpha1.CreateOrganizationRequest{
+			Organization: &saasv1alpha1.Organization{
+				Name:        orgName,
+				Description: orgDescription,
+			},
+		}
+
+		org, err := hc.CreateOrganization(ctx, req)
+		if err != nil {
+			return fmt.Errorf("failed to create organization: %w", err)
+		}
+
+		fmt.Fprintf(cmd.OutOrStdout(), "Organization created successfully:\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "ID:          %s\n", org.Id)
+		fmt.Fprintf(cmd.OutOrStdout(), "Name:        %s\n", org.Name)
+		fmt.Fprintf(cmd.OutOrStdout(), "Description: %s\n", org.Description)
+
+		return nil
+	}
+
+	return cmd
+}
+
 type renderFn func(int, int, int) string
 
 func renderList(stream io.Writer, organizationsWithRoles []*saasv1alpha1.OrganizationWithRole) {
 	renderFns := make([]renderFn, len(organizationsWithRoles))
 
-	longestNameLen := len(nameHeader) // Start with header length
-	longestRoleLen := len(roleHeader) // Start with header length
-	longestIDLen := len(idHeader)     // Start with header length
+	longestNameLen := len(nameHeader)
+	longestRoleLen := len(roleHeader)
+	longestIDLen := len(idHeader)
 
 	for i, org := range organizationsWithRoles {
 		if len(org.Organization.Name) > longestNameLen {
@@ -97,7 +196,6 @@ func renderList(stream io.Writer, organizationsWithRoles []*saasv1alpha1.Organiz
 		}
 	}
 
-	// Print headers
 	nameHeader := text.AlignLeft.Apply(nameHeader, longestNameLen+gapSize)
 	idHeader := text.AlignLeft.Apply(idHeader, longestIDLen+gapSize)
 	roleHeader := text.AlignLeft.Apply(roleHeader, longestRoleLen)
