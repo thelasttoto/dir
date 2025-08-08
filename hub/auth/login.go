@@ -73,10 +73,11 @@ func Login(
 	}
 
 	// Get tenant
-	tName, err := token.GetTenantNameFromToken(webserverSession.Tokens.AccessToken)
+	tName := "axel_org"
+	/*tName, err := token.GetTenantNameFromToken(webserverSession.Tokens.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get org id: %w", err)
-	}
+	}*/
 
 	// Get username from token
 	user, err := token.GetUserFromToken(webserverSession.Tokens.AccessToken)
@@ -94,6 +95,9 @@ func Login(
 		AccessToken:  webserverSession.Tokens.AccessToken,
 		RefreshToken: webserverSession.Tokens.RefreshToken,
 		IDToken:      webserverSession.Tokens.IDToken,
+	}
+	if webserverSession.Tokens.RefreshToken == "" {
+		fmt.Printf("###AXT:: Login(): webserverSession.Tokens.RefreshToken is empty\n")
 	}
 
 	return currentSession, nil

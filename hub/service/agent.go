@@ -102,18 +102,28 @@ func ParseRepoTagID(id string) any {
 	return &v1alpha1.PushAgentRequest_RepositoryName{RepositoryName: id}
 }
 
+// ParseOrganisationName parses an organization name string from a Repository.
+// Returns an OrganizationName.
+func ParseOrganisationName(repository string) (string, error) {
+	parts := strings.Split(repository, "/")
+	if len(parts) == 2 {
+		return parts[0], nil
+	}
+	return "", fmt.Errorf("invalid repository format: %s. Expected format is '<org>/<repo>'", repository)
+}
+
 // PushAgent pushes an agent to the hub and returns the response.
-// It uses the provided session for authentication.
+// It uses the provided session for authentication.Ò
 func PushAgent(
 	ctx context.Context,
 	hc hubClient.Client,
 	agentBytes []byte,
-	repoID any,
+	repository any,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.PushAgentResponse, error) {
 	ctx = addAuthToContext(ctx, session)
 
-	resp, err := hc.PushAgent(ctx, agentBytes, repoID)
+	resp, err := hc.PushAgent(ctx, agentBytes, repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to push agent: %w", err)
 	}

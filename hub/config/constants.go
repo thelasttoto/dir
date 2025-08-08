@@ -12,5 +12,5 @@ const (
 	DefaultHubAddress = "https://agent-directory.outshift.com"
 
 	// DefaultHubBackendGRPCPort is the default gRPC port for the Agent Hub backend.
-	DefaultHubBackendGRPCPort = 443
+	DefaultHubBackendGRPCPort = 8080
 )

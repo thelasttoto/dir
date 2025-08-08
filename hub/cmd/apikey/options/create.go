@@ -11,7 +11,8 @@ import (
 type ApiKeyCreateOptions struct {
 	*options.HubOptions
 
-	Role string
+	Role           string
+	OrganizationId string
 }
 
 func NewApiKeyCreateOptions(hubOpts *options.HubOptions, cmd *cobra.Command) *ApiKeyCreateOptions {
@@ -21,6 +22,7 @@ func NewApiKeyCreateOptions(hubOpts *options.HubOptions, cmd *cobra.Command) *Ap
 
 	opt.AddRegisterFn(func() error {
 		cmd.Flags().StringVarP(&opt.Role, "role", "r", "", "Role name")
+		cmd.Flags().StringVarP(&opt.OrganizationId, "org", "o", "", "Organization ID")
 
 		return nil
 	})
