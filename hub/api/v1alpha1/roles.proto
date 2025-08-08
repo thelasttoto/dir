@@ -10,3 +10,11 @@ enum ProductRole {
   PRODUCT_ROLE_EDITOR = 2;
   PRODUCT_ROLE_VIEWER = 3;
 }
+
+enum Role {
+  ROLE_UNKNOWN = 0; // default value, should not be used
+  ROLE_ORG_ADMIN = 1;
+  ROLE_ADMIN = 2;
+  ROLE_EDITOR = 3;
+  ROLE_VIEWER = 4;
+}
