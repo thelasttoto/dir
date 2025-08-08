@@ -36,16 +36,11 @@ func Logout(
 // doLogout revokes the current session's tokens using the Okta client.
 // Returns an error if the logout request fails or the response status is not OK.
 func doLogout(session *sessionstore.HubSession, oktaClient okta.Client) error {
-	if session == nil || session.CurrentTenant == "" || session.Tokens == nil {
+	if session == nil || session.Tokens == nil {
 		return nil
 	}
 
-	// Check if the session exists
-	if _, ok := session.Tokens[session.CurrentTenant]; !ok {
-		return nil
-	}
-
-	resp, err := oktaClient.Logout(&okta.LogoutRequest{IDToken: session.Tokens[session.CurrentTenant].IDToken})
+	resp, err := oktaClient.Logout(&okta.LogoutRequest{IDToken: session.Tokens.IDToken})
 	if err != nil {
 		return fmt.Errorf("failed to logout: %w", err)
 	}

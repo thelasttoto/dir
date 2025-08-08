@@ -57,8 +57,10 @@ func New(serverAddr string) (*client, error) { //nolint:revive
 	}
 
 	return &client{
-		AgentDirServiceClient: v1alpha1.NewAgentDirServiceClient(conn),
-		ApiKeyServiceClient:   v1alpha1.NewApiKeyServiceClient(conn),
+		AgentDirServiceClient:     v1alpha1.NewAgentDirServiceClient(conn),
+		ApiKeyServiceClient:       v1alpha1.NewApiKeyServiceClient(conn),
+		OrganizationServiceClient: v1alpha1.NewOrganizationServiceClient(conn),
+		UserServiceClient:         v1alpha1.NewUserServiceClient(conn),
 	}, nil
 }
 
