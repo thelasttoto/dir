@@ -22,13 +22,12 @@ import (
 // Returns the configured *cobra.Command.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "push {<repository> | <repository_id>} {<model.json> | --stdin} ",
+		Use:   "push <repository> {<model.json> | --stdin} ",
 		Short: "Push model to Agent Hub",
 		Long: `Push a model to the Agent Hub.
 
 Parameters:
   <repository>    Repository name in the format of '<owner>/<name>'
-  <repository_id> UUID of an existing repository
   <model.json>    Path to the model file (optional)
   --stdin         Read model from standard input (optional)
 
@@ -53,8 +52,11 @@ Examples:
 		if !ok || currentSession == nil {
 			errors.New("could not get current hub session")
 		}
+		fmt.Printf("###AXT:: NewCommand(Push): currentSession=%+v\n", currentSession)
+		fmt.Printf("###AXT:: NewCommand(Push): auth.HasLoginCreds(currentSession)=%+v\n", auth.HasLoginCreds(currentSession))
+		fmt.Printf("###AXT:: NewCommand(Push): auth.HasApiKey(currentSession)=%+v\n", auth.HasApiKey(currentSession))
 
-		if !auth.HasLoginCreds(currentSession) && auth.HasApiKey(currentSession) {
+		if /*!auth.HasLoginCreds(currentSession) &&*/ auth.HasApiKey(currentSession) {
 			fmt.Println("User is authenticated with API key, using it to get credentials...")
 
 			if err := auth.RefreshApiKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
@@ -91,9 +93,9 @@ Examples:
 		}
 
 		// TODO: Push based on repoName and version misleading
-		repoID := service.ParseRepoTagID(args[0])
+		repository := service.ParseRepoTagID(args[0])
 
-		resp, err := service.PushAgent(cmd.Context(), hc, agentBytes, repoID, currentSession)
+		resp, err := service.PushAgent(cmd.Context(), hc, agentBytes, repository, currentSession)
 		if err != nil {
 			return fmt.Errorf("failed to push agent: %w", err)
 		}

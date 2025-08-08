@@ -20,6 +20,10 @@ message PushRecordRequest {
       (buf.validate.field).string.max_len = 100
     ];
   }
+  string organisation_name = 3 [
+    (buf.validate.field).string.pattern = "^[a-z0-9_-]+(/[a-z0-9_-]+)*$",
+    (buf.validate.field).string.max_len = 100
+  ];
   core.v1alpha1.Object model = 4;
 }
 

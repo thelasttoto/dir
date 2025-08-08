@@ -21,7 +21,7 @@ func RefreshApiKeyAccessToken(ctx context.Context, session *sessionstore.HubSess
 
 	idpClient := idp.NewClient(session.AuthConfig.IdpIssuerAddress, httpUtils.CreateSecureHTTPClient())
 
-	idpResp, err := idpClient.GetAccessTokenFromApiKey(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
+	idpResp, err := idpClient.GetAccessTokenFromOkta(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
 	if err != nil {
 		return fmt.Errorf("failed to fetch user tenants: %w", err)
 	}

@@ -18,11 +18,12 @@ func CreateAPIKey(
 	ctx context.Context,
 	hc hubClient.Client,
 	role string,
+	organizationId string,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.CreateApiKeyResponse, error) {
 	ctx = addAuthToContext(ctx, session)
 
-	resp, err := hc.CreateAPIKey(ctx, nil, role)
+	resp, err := hc.CreateAPIKey(ctx, nil, role, organizationId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key: %w", err)
 	}

@@ -12,6 +12,7 @@ import "saas/v1alpha1/roles.proto";
 
 message CreateApiKeyRequest {
   ProductRole role = 1;
+  string organization_name = 2;
 }
 
 message CreateApiKeyResponse {
@@ -19,7 +20,7 @@ message CreateApiKeyResponse {
 }
 
 message DeleteApiKeyRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  string id = 1;
 }
 
 message DeleteApiKeyResponse {}

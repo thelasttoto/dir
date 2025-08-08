@@ -5,6 +5,7 @@ package saas.v1alpha1;
 option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
 
 message ApiKey {
+  string id = 1;
   string client_id = 2;
   string secret = 3;
 }

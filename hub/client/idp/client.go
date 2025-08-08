@@ -6,6 +6,7 @@ package idp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,9 @@ const (
 	AccessTokenScope = "openid offline_access"
 	// Grant type for the access token request.
 	AccessTokenGrantType = "password"
+	// AccessTokenGrantTypeClientCredentials is the grant type for client credentials.
+	AccessTokenGrantTypeClientCredentials = "client_credentials"
+	AccessTokenCustomScope                = "customScope" // Custom scope for the access token request, can be changed as needed.
 )
 
 // TenantListResponse represents a list of tenants returned by the IDP API.
@@ -74,6 +78,9 @@ type Client interface {
 
 	// GetAccessToken retrieves an access token using the provided username and secret.
 	GetAccessTokenFromApiKey(ctx context.Context, username string, secret string) (*GetAccessTokenResponse, error)
+
+	// GetAccessToken retrieves an access token using the provided username and secret.
+	GetAccessTokenFromOkta(ctx context.Context, username string, secret string) (*GetAccessTokenResponse, error)
 }
 
 // client implements the Client interface for the IDP API.
@@ -167,6 +174,58 @@ func (c *client) GetAccessTokenFromApiKey(ctx context.Context, username string, 
 
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var body []byte
+	if resp.Body != nil {
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response body: %w", err)
+		}
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var parsedResponse *GetAccessTokenResponse
+		if err = json.Unmarshal(body, &parsedResponse); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		return parsedResponse, nil
+	}
+
+	return nil, fmt.Errorf("Bad response status code: %d, body: %s", resp.StatusCode, string(body))
+}
+
+func (c *client) GetAccessTokenFromOkta(ctx context.Context, client_id string, secret string) (*GetAccessTokenResponse, error) {
+	/*
+		This is based on https://developer.okta.com/docs/guides/implement-grant-type/clientcreds/main/#request-for-token
+	*/
+
+	// The request URL for the Okta API to get an access token.
+	requestURL := fmt.Sprintf("%s%s", c.baseURL, AccessTokenEndpoint)
+
+	// The auh header for the request, which includes the client ID and secret.
+	authHeader := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", client_id, secret))))
+
+	// The body for the request, which includes the grant type and scope.
+	data := url.Values{}
+	data.Set("grant_type", AccessTokenGrantTypeClientCredentials)
+	data.Set("scope", AccessTokenCustomScope)
+
+	fmt.Printf("###AXT:: GetAccessTokenFromOkta: requestURL=%s\n", requestURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", authHeader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

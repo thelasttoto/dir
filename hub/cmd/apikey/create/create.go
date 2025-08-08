@@ -4,8 +4,10 @@
 package create
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
@@ -38,7 +40,7 @@ Example:
 }
 
 func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOptions) error {
-	fmt.Printf("Creating new API key with role: %s\n", opts.Role)
+	fmt.Printf("Creating new API key with role: '%s' for organization: '%s'\n", opts.Role, opts.OrganizationId)
 
 	// Retrieve session from context
 	ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
@@ -62,10 +64,18 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOpt
 		return fmt.Errorf("failed to create hub client: %w", err)
 	}
 
-	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, currentSession)
+	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, opts.OrganizationId, currentSession)
 	if err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
 	}
+
 	fmt.Printf("API Key created successfully: %s\n", resp)
+
+	prettyModel, err := json.MarshalIndent(resp.Token, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal agent: %w", err)
+	}
+
+	fmt.Fprintf(os.Stdout, "%s\n", string(prettyModel))
 	return nil
 }

@@ -13,7 +13,6 @@ import (
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	service "github.com/agntcy/dir/hub/service"
 	"github.com/agntcy/dir/hub/sessionstore"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -52,10 +51,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyDeleteOpt
 
 	// Retreive the API key ID to delete from the command arguments
 	apiKeyId := args[0]
-	err := uuid.Validate(apiKeyId)
-	if err != nil {
-		return fmt.Errorf("invalid API Key ID: %w", err)
-	}
 	fmt.Printf("Deleting API key with ID: %s\n", apiKeyId)
 
 	// Retrieve session from context
