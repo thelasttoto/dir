@@ -1,8 +1,8 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-// Package orgs provides the CLI command for listing organizations (tenants) for the logged-in user.
-// The orgs command only lists organizations/tenants. To switch between organizations, use the "orgs switch" subcommand.
+// Package orgs provides the CLI command for listing organizations (organizations) for the logged-in user.
+// The orgs command only lists organizations/organizations. To switch between organizations, use the "orgs switch" subcommand.
 package orgs
 
 import (
@@ -10,27 +10,29 @@ import (
 	"fmt"
 	"io"
 
+	saasv1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	auth "github.com/agntcy/dir/hub/auth"
-	"github.com/agntcy/dir/hub/client/idp"
+	hubClient "github.com/agntcy/dir/hub/client/hub"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
-	"github.com/agntcy/dir/hub/cmd/orgswitch"
 	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
 const (
-	selectionMark = "*"
-	gapSize       = 4
+	nameHeader = "Organization Name"
+	idHeader   = "Organization ID"
+	roleHeader = "Role"
+	gapSize    = 4
 )
 
 // NewCommand creates the "orgs" command for the Agent Hub CLI.
-// It lists organizations (tenants) for the logged-in user. To switch organizations, use the "orgs switch" subcommand.
+// It lists organizations (organizations) for the logged-in user.
 // Returns the configured *cobra.Command.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "orgs",
-		Aliases: []string{"tenants"},
+		Aliases: []string{"organizations"},
 		Short:   "List organizations for logged in user",
 	}
 
@@ -43,56 +45,65 @@ func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 			return errors.New("no current session found. please login first")
 		}
 
-		orgs, err := auth.FetchUserTenants(cmd.Context(), currentSession)
+		hc, err := hubClient.New(currentSession.HubBackendAddress)
+		if err != nil {
+			return fmt.Errorf("failed to create hub client: %w", err)
+		}
+
+		ctx := auth.AddAuthToContext(cmd.Context(), currentSession)
+
+		orgs, err := hc.ListOrganizations(ctx, &saasv1alpha1.ListOrganizationsRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to get orgs list: %w", err)
 		}
 
-		renderList(cmd.OutOrStdout(), orgs, currentSession.CurrentTenant)
+		renderList(cmd.OutOrStdout(), orgs.Organizations)
 
 		return nil
 	}
 
-	cmd.AddCommand(
-		orgswitch.NewCommand(hubOpts),
-	)
-
 	return cmd
 }
 
-type renderFn func(int, int) string
+type renderFn func(int, int, int) string
 
-func renderList(stream io.Writer, tenants []*idp.TenantResponse, currentTenant string) {
-	renderFns := make([]renderFn, len(tenants))
+func renderList(stream io.Writer, organizationsWithRoles []*saasv1alpha1.OrganizationWithRole) {
+	renderFns := make([]renderFn, len(organizationsWithRoles))
 
-	longestNameLen := 0
+	longestNameLen := len(nameHeader) // Start with header length
+	longestRoleLen := len(roleHeader) // Start with header length
+	longestIDLen := len(idHeader)     // Start with header length
 
-	longestIDLen := 0
-
-	for i, tenant := range tenants {
-		if len(tenant.Name) > longestNameLen {
-			longestNameLen = len(tenant.Name)
+	for i, org := range organizationsWithRoles {
+		if len(org.Organization.Name) > longestNameLen {
+			longestNameLen = len(org.Organization.Name)
 		}
 
-		if len(tenant.ID) > longestIDLen {
-			longestIDLen = len(tenant.ID)
+		if len(org.Organization.Id) > longestIDLen {
+			longestIDLen = len(org.Organization.Id)
 		}
 
-		renderFns[i] = func(lName, lId int) string {
-			var selection string
-			if tenant.Name == currentTenant {
-				selection = selectionMark
-			}
+		if len(org.Role.String()) > longestRoleLen {
+			longestRoleLen = len(org.Role.String())
+		}
 
-			selectionCol := text.AlignLeft.Apply(selection, len(selectionMark)+1) //nolint:mnd
-			nameCol := text.AlignLeft.Apply(tenant.Name, lName+gapSize)
-			idCol := text.AlignLeft.Apply(tenant.ID, lId)
+		renderFns[i] = func(lName, lId, lRole int) string {
 
-			return fmt.Sprintf("%s%s%s", selectionCol, nameCol, idCol)
+			nameCol := text.AlignLeft.Apply(org.Organization.Name, lName+gapSize)
+			idCol := text.AlignLeft.Apply(org.Organization.Id, lId+gapSize)
+			roleCol := text.AlignLeft.Apply(org.Role.String(), lRole)
+
+			return fmt.Sprintf("%s%s%s", nameCol, idCol, roleCol)
 		}
 	}
 
-	for _, tenant := range renderFns {
-		fmt.Fprintln(stream, tenant(longestNameLen, longestIDLen)) //nolint:errcheck
+	// Print headers
+	nameHeader := text.AlignLeft.Apply(nameHeader, longestNameLen+gapSize)
+	idHeader := text.AlignLeft.Apply(idHeader, longestIDLen+gapSize)
+	roleHeader := text.AlignLeft.Apply(roleHeader, longestRoleLen)
+	fmt.Fprintf(stream, "%s%s%s\n", nameHeader, idHeader, roleHeader) //nolint:errcheck
+
+	for _, organization := range renderFns {
+		fmt.Fprintln(stream, organization(longestNameLen, longestIDLen, longestRoleLen)) //nolint:errcheck
 	}
 }

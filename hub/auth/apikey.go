@@ -23,7 +23,7 @@ func RefreshApiKeyAccessToken(ctx context.Context, session *sessionstore.HubSess
 
 	idpResp, err := idpClient.GetAccessTokenFromOkta(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
 	if err != nil {
-		return fmt.Errorf("failed to fetch user tenants: %w", err)
+		return fmt.Errorf("failed to refresh API key access token: %w", err)
 	}
 
 	session.ApiKeyAccessToken = &sessionstore.Tokens{

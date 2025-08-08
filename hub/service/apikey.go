@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
+	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/sessionstore"
 )
@@ -21,7 +22,7 @@ func CreateAPIKey(
 	organizationId string,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.CreateApiKeyResponse, error) {
-	ctx = addAuthToContext(ctx, session)
+	ctx = auth.AddAuthToContext(ctx, session)
 
 	resp, err := hc.CreateAPIKey(ctx, nil, role, organizationId)
 	if err != nil {
@@ -39,7 +40,7 @@ func DeleteAPIKey(
 	apikeyId string,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.DeleteApiKeyResponse, error) {
-	ctx = addAuthToContext(ctx, session)
+	ctx = auth.AddAuthToContext(ctx, session)
 
 	resp, err := hc.DeleteAPIKey(ctx, nil, apikeyId)
 	if err != nil {

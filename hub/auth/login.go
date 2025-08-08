@@ -72,26 +72,16 @@ func Login(
 		return nil, fmt.Errorf("failed to fetch tokens: %w", err)
 	}
 
-	// Get tenant
-	tName := "axel_org"
-	/*tName, err := token.GetTenantNameFromToken(webserverSession.Tokens.AccessToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get org id: %w", err)
-	}*/
-
 	// Get username from token
 	user, err := token.GetUserFromToken(webserverSession.Tokens.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user from token: %w", err)
 	}
 
-	currentSession.Tokens = make(map[string]*sessionstore.Tokens)
-	// Set current tenant
-	currentSession.CurrentTenant = tName
 	// Set user
 	currentSession.User = user
 	// Set tokens
-	currentSession.Tokens[tName] = &sessionstore.Tokens{
+	currentSession.Tokens = &sessionstore.Tokens{
 		AccessToken:  webserverSession.Tokens.AccessToken,
 		RefreshToken: webserverSession.Tokens.RefreshToken,
 		IDToken:      webserverSession.Tokens.IDToken,
@@ -108,12 +98,8 @@ func HasLoginCreds(currentSession *sessionstore.HubSession) bool {
 		return false
 	}
 
-	if currentSession.CurrentTenant == "" || len(currentSession.Tokens) == 0 {
-		return false
-	}
-
-	tokens, ok := currentSession.Tokens[currentSession.CurrentTenant]
-	if !ok || tokens == nil {
+	tokens := currentSession.Tokens
+	if tokens == nil {
 		return false
 	}
 
