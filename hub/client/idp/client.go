@@ -138,7 +138,6 @@ func (c *client) GetAccessTokenFromOkta(ctx context.Context, client_id string, s
 	data.Set("grant_type", AccessTokenGrantTypeClientCredentials)
 	data.Set("scope", AccessTokenCustomScope)
 
-	fmt.Printf("###AXT:: GetAccessTokenFromOkta: requestURL=%s\n", requestURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

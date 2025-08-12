@@ -40,7 +40,18 @@ Example:
 }
 
 func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOptions) error {
-	fmt.Printf("Creating new API key with role: '%s' for organization: '%s'\n", opts.Role, opts.OrganizationId)
+	if opts.OrganizationId == "" && opts.OrganizationName == "" {
+		return errors.New("organization ID or name is required")
+	}
+	if opts.OrganizationId != "" {
+		fmt.Printf("Creating new API key with role: '%s' for org ID: '%s'\n", opts.Role, opts.OrganizationId)
+		if opts.OrganizationName != "" {
+			// Org Id & name are both set, use ID preferentially.
+			opts.OrganizationName = ""
+		}
+	} else {
+		fmt.Printf("Creating new API key with role: '%s' for org name: '%s'\n", opts.Role, opts.OrganizationName)
+	}
 
 	// Retrieve session from context
 	ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
@@ -64,7 +75,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOpt
 		return fmt.Errorf("failed to create hub client: %w", err)
 	}
 
-	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, opts.OrganizationId, currentSession)
+	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, opts.OrganizationId, opts.OrganizationName, currentSession)
 	if err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
 	}

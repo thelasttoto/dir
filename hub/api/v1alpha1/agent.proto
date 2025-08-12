@@ -8,6 +8,7 @@ import "core/v1alpha1/locator.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 import "saas/v1alpha1/category.proto";
+import "saas/v1alpha1/mcp.proto";
 import "buf/validate/validate.proto";
 
 message Agent {
@@ -35,4 +36,7 @@ message Agent {
   optional string description = 17 [(buf.validate.field).string.max_len = 350];
   repeated string authors = 18;
   repeated string extensions = 19;
+
+  // Mcp related field
+  optional Mcp mcp = 20;
 }
