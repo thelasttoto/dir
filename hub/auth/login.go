@@ -86,9 +86,6 @@ func Login(
 		RefreshToken: webserverSession.Tokens.RefreshToken,
 		IDToken:      webserverSession.Tokens.IDToken,
 	}
-	if webserverSession.Tokens.RefreshToken == "" {
-		fmt.Printf("###AXT:: Login(): webserverSession.Tokens.RefreshToken is empty\n")
-	}
 
 	return currentSession, nil
 }

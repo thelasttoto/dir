@@ -44,7 +44,6 @@ func FetchAuthConfig(ctx context.Context, frontedURL string) (*AuthConfig, error
 		return nil, fmt.Errorf("%w: %w", ErrFetchingConfig, err)
 	}
 
-	fmt.Printf("req=%s\n", req.URL.String())
 	resp, err := httpUtils.CreateSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFetchingConfig, err)
@@ -69,7 +68,6 @@ func FetchAuthConfig(ctx context.Context, frontedURL string) (*AuthConfig, error
 	if authConfig == nil {
 		return nil, fmt.Errorf("%w: %w", ErrParsingConfig, errors.New("config is nil"))
 	}
-	fmt.Printf("authConfig=%+v\n", authConfig)
 	backendAddr := authConfig.HubBackendAddress
 	backendAddr = strings.TrimPrefix(backendAddr, "http://")
 	backendAddr = strings.TrimPrefix(backendAddr, "https://")

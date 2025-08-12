@@ -30,7 +30,7 @@ type Client interface {
 	// PullAgent downloads an agent from the hub and returns the agent data or an error.
 	PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequest) ([]byte, error)
 	// CreateAPIKey creates an API key for the specified role and returns the (clientId, secret) or an error.
-	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string) (*v1alpha1.CreateApiKeyResponse, error)
+	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error)
 	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
 	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error)
 }
@@ -66,13 +66,10 @@ func New(serverAddr string) (*client, error) { //nolint:revive
 
 // PushAgent uploads an agent to the hub in chunks and returns the response or an error.
 func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*v1alpha1.PushRecordResponse, error) {
-	fmt.Printf("###AXT:: PushAgent(): --> <--\n")
 	var parsedAgent *corev1alpha1.Agent
 	if err := json.Unmarshal(agent, &parsedAgent); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal agent: %w", err)
 	}
-	fmt.Printf("###AXT:: PushAgent(): repository=%v\n", repository)
-	fmt.Printf("###AXT:: PushAgent(): parsedAgent.Name=%v\n", parsedAgent.Name)
 
 	d := digest.FromBytes(agent).String()
 	t := corev1alpha1.ObjectType_OBJECT_TYPE_AGENT.String()
@@ -117,14 +114,14 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 			if parsedRepo.RepositoryName != parsedAgent.Name {
 				return nil, fmt.Errorf("repository name mismatch: expected %s, got %s", parsedAgent.Name, parsedRepo.RepositoryName)
 			}
-			msg.OrganisationName, err = GetOrganisationNameFromRepository(parsedRepo.RepositoryName)
+			msg.OrganizationName, err = GetOrganizationNameFromRepository(parsedRepo.RepositoryName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse organization name from repository: %w", err)
 			}
 		case *v1alpha1.PushAgentRequest_RepositoryId:
 			msg.Repository = parsedRepo
 			// In this case, we read the organization name from the agent
-			msg.OrganisationName, err = GetOrganisationNameFromRepository(parsedAgent.Name)
+			msg.OrganizationName, err = GetOrganizationNameFromRepository(parsedAgent.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse organization name from agent: %w", err)
 			}
@@ -145,7 +142,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 	return resp, nil
 }
 
-func GetOrganisationNameFromRepository(repository string) (string, error) {
+func GetOrganizationNameFromRepository(repository string) (string, error) {
 	parts := strings.Split(repository, "/")
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid repository format: %s. Expected format is '<org>/<repo>'", repository)
@@ -180,13 +177,13 @@ func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequ
 	return buffer.Bytes(), nil
 }
 
-func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error) {
-	roleValue, ok := v1alpha1.ProductRole_value[roleName]
+func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error) {
+	roleValue, ok := v1alpha1.Role_value[roleName]
 	if !ok {
 		return nil, fmt.Errorf("Unknown role: %w", roleValue)
 	}
 	req := &v1alpha1.CreateApiKeyRequest{
-		Role:             v1alpha1.ProductRole(roleValue),
+		Role:             v1alpha1.Role(roleValue),
 		OrganizationName: organizationName,
 	}
 

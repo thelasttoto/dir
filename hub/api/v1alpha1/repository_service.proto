@@ -36,9 +36,10 @@ message ListRepositoriesRequest {
   PaginationParam pagination = 1;
   OrderParam order = 2;
   RepositoryFilterParam filters = 3;
-  bool include_agents = 4;
+  string records_filter = 4;
   optional bool not_empty = 5;
   optional bool owned_only = 6;
+  optional string organization_id = 7;
 }
 
 message ListRepositoriesResponse {
@@ -48,7 +49,7 @@ message ListRepositoriesResponse {
 
 message GetRepositoryRequest {
   RepositoryIdentifier id = 1;
-  bool include_agents = 2;
+  string records_filter = 2;
 }
 
 message GetRepositoryResponse {
@@ -74,6 +75,7 @@ message CreateRepositoryRequest {
   ];
   string verification_type = 2 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9 ]*$"];
   optional RepositoryPrivacySettings privacy_settings = 3;
+  string organization_id = 4 [(buf.validate.field).string.uuid = true];
 }
 
 message RepositoryPrivacySettings {

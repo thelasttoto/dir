@@ -52,11 +52,8 @@ Examples:
 		if !ok || currentSession == nil {
 			errors.New("could not get current hub session")
 		}
-		fmt.Printf("###AXT:: NewCommand(Push): currentSession=%+v\n", currentSession)
-		fmt.Printf("###AXT:: NewCommand(Push): auth.HasLoginCreds(currentSession)=%+v\n", auth.HasLoginCreds(currentSession))
-		fmt.Printf("###AXT:: NewCommand(Push): auth.HasApiKey(currentSession)=%+v\n", auth.HasApiKey(currentSession))
 
-		if /*!auth.HasLoginCreds(currentSession) &&*/ auth.HasApiKey(currentSession) {
+		if !auth.HasLoginCreds(currentSession) && auth.HasApiKey(currentSession) {
 			fmt.Println("User is authenticated with API key, using it to get credentials...")
 
 			if err := auth.RefreshApiKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
