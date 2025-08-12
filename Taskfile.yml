@@ -416,6 +416,115 @@ tasks:
           --wait-for-jobs \
           --timeout "15m"
 
+  deploy:kubernetes:spire:local:
+    desc: Deploy a local Directory server in Kubernetes with SPIRE support
+    deps:
+      - deploy:kubernetes:setup-cluster
+    vars:
+      # Kind args
+      KIND_CLUSTER_NAME: '{{ .KIND_CLUSTER_NAME | default "agntcy-cluster" }}'
+      KIND_CREATE_OPTS: '{{ .KIND_CREATE_OPTS | default "" }}'
+      # SPIRE Config
+      HELM_SPIRE_NAMESPACE: '{{ .HELM_NAMESPACE | default "spire" }}'
+      HELM_SPIRE_CHART_PATH: '{{ .ROOT_DIR }}/install/charts/spire'
+      HELM_SPIRE_VALUES_PATH: '{{ .ROOT_DIR }}/install/charts/spire/values.yaml'
+      # Helm args (server)
+      HELM_NAMESPACE: '{{ .HELM_NAMESPACE | default "dir-server" }}'
+      HELM_CHART_PATH: '{{ .ROOT_DIR }}/install/charts/dir'
+      HELM_VALUES_PATH: '{{ .ROOT_DIR }}/install/charts/dir/values-spire.yaml'
+      # Helm args (client)
+      HELM_CLIENT_NAMESPACE: '{{ .HELM_CLIENT_NAMESPACE | default "dir-client" }}'
+      HELM_CLIENT_CHART_PATH: '{{ .ROOT_DIR }}/install/charts/dirctl'
+      HELM_CLIENT_PUSH_VALUES_PATH: '{{ .ROOT_DIR }}/install/charts/dirctl/values-push-spire.yaml'
+      HELM_CLIENT_SEARCH_VALUES_PATH: '{{ .ROOT_DIR }}/install/charts/dirctl/values-search-spire.yaml'
+    cmds:
+      # Create zot configuration using helper task
+      - task: deploy:zot:config
+        vars:
+          ZOT_CONFIG_DIR: /opt/zot-config
+
+      # Deploy SPIRE
+      - |
+        {{ .HELM_BIN }} dependency build {{ .HELM_SPIRE_CHART_PATH }}
+        {{ .HELM_BIN }} upgrade spire \
+          {{ .HELM_SPIRE_CHART_PATH }} \
+          -f {{ .HELM_SPIRE_VALUES_PATH }} \
+          --namespace {{ .HELM_SPIRE_NAMESPACE }} \
+          --create-namespace \
+          --install \
+          --wait \
+          --wait-for-jobs \
+          --timeout "15m"
+
+      # Create SPIFFE workload API for services
+      - |
+        # Create SPIFFE ID for the SPIRE server
+        kubectl exec -n spire spire-server-0 -- \
+          /opt/spire/bin/spire-server entry create \
+          -spiffeID spiffe://example.org/ns/spire/sa/spire-agent \
+          -selector k8s_psat:cluster:demo-cluster \
+          -selector k8s_psat:agent_ns:spire \
+          -selector k8s_psat:agent_sa:spire-agent \
+          -node
+
+        # Create SPIFFE ID for the default service account in server namespace
+        kubectl exec -n spire spire-server-0 -- \
+          /opt/spire/bin/spire-server entry create \
+          -spiffeID spiffe://example.org/ns/{{.HELM_NAMESPACE}}/sa/default \
+          -parentID spiffe://example.org/ns/spire/sa/spire-agent \
+          -selector k8s:ns:{{.HELM_NAMESPACE}} \
+          -selector k8s:sa:default
+        
+        # Create SPIFFE ID for the default service account in client namespace
+        kubectl exec -n spire spire-server-0 -- \
+          /opt/spire/bin/spire-server entry create \
+          -spiffeID spiffe://example.org/ns/{{.HELM_CLIENT_NAMESPACE}}/sa/default \
+          -parentID spiffe://example.org/ns/spire/sa/spire-agent \
+          -selector k8s:ns:{{.HELM_CLIENT_NAMESPACE}} \
+          -selector k8s:sa:default
+
+      # Deploy server chart
+      - |
+        {{ .HELM_BIN }} dependency build {{ .HELM_CHART_PATH }}
+        {{ .HELM_BIN }} upgrade dir \
+          {{ .HELM_CHART_PATH }} \
+          -f {{ .HELM_VALUES_PATH }} \
+          --set apiserver.image.tag="{{ .IMAGE_TAG }}" \
+          --namespace {{ .HELM_NAMESPACE }} \
+          --create-namespace \
+          --install \
+          --wait \
+          --wait-for-jobs \
+          --timeout "15m"
+
+      # Deploy client (push) chart
+      - |
+        {{ .HELM_BIN }} dependency build {{ .HELM_CLIENT_CHART_PATH }}
+        {{ .HELM_BIN }} upgrade dirctl-push \
+          {{ .HELM_CLIENT_CHART_PATH }} \
+          -f {{ .HELM_CLIENT_PUSH_VALUES_PATH }} \
+          --set image.tag="{{ .IMAGE_TAG }}" \
+          --namespace {{ .HELM_CLIENT_NAMESPACE }} \
+          --create-namespace \
+          --install \
+          --wait \
+          --wait-for-jobs \
+          --timeout "15m"
+
+      # Deploy client (search) chart
+      - |
+          {{ .HELM_BIN }} dependency build {{ .HELM_CLIENT_CHART_PATH }}
+          {{ .HELM_BIN }} upgrade dirctl-search \
+            {{ .HELM_CLIENT_CHART_PATH }} \
+            -f {{ .HELM_CLIENT_SEARCH_VALUES_PATH }} \
+            --set image.tag="{{ .IMAGE_TAG }}" \
+            --namespace {{ .HELM_CLIENT_NAMESPACE }} \
+            --create-namespace \
+            --install \
+            --wait \
+            --wait-for-jobs \
+            --timeout "15m"
+
   deploy:kubernetes:local:port-forward:
     aliases: [deploy:local:port-forward]
     desc: Set up port-forwarding for the local deployment

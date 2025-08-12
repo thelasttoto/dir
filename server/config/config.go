@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	authz "github.com/agntcy/dir/server/authz/config"
 	database "github.com/agntcy/dir/server/database/config"
 	sqliteconfig "github.com/agntcy/dir/server/database/sqlite/config"
 	routing "github.com/agntcy/dir/server/routing/config"
@@ -42,6 +43,9 @@ type Config struct {
 	// API configuration
 	ListenAddress      string `json:"listen_address,omitempty"      mapstructure:"listen_address"`
 	HealthCheckAddress string `json:"healthcheck_address,omitempty" mapstructure:"healthcheck_address"`
+
+	// Authz configuration
+	Authz authz.Config `json:"authz,omitempty" mapstructure:"authz"`
 
 	// Provider configuration
 	Provider string         `json:"provider,omitempty" mapstructure:"provider"`
@@ -90,6 +94,15 @@ func LoadConfig() (*Config, error) {
 
 	_ = v.BindEnv("healthcheck_address")
 	v.SetDefault("healthcheck_address", DefaultHealthCheckAddress)
+
+	//
+	// Authz configuration
+	//
+	_ = v.BindEnv("authz.socket_path")
+	v.SetDefault("authz.socket_path", "")
+
+	_ = v.BindEnv("authz.trust_domain")
+	v.SetDefault("authz.trust_domain", "")
 
 	//
 	// Provider configuration

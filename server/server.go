@@ -24,8 +24,14 @@ import (
 	"github.com/agntcy/dir/server/sync"
 	"github.com/agntcy/dir/server/types"
 	"github.com/agntcy/dir/utils/logging"
+	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -96,27 +102,67 @@ func New(ctx context.Context, cfg *config.Config) (*Server, error) {
 	// Create sync service
 	syncService := sync.New(databaseAPI, storeAPI, options)
 
-	// Create server
-	server := &Server{
+	// Create server transport options
+	var serverOpts []grpc.ServerOption
+
+	// Create SPIFFE mTLS services if configured
+	if cfg.Authz.SocketPath != "" {
+		x509Src, err := workloadapi.NewX509Source(ctx,
+			workloadapi.WithClientOptions(
+				workloadapi.WithAddr(cfg.Authz.SocketPath),
+				// workloadapi.WithLogger(logger.Std),
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch svid: %w", err)
+		}
+
+		bundleSrc, err := workloadapi.NewBundleSource(ctx,
+			workloadapi.WithClientOptions(
+				workloadapi.WithAddr(cfg.Authz.SocketPath),
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch trust bundle: %w", err)
+		}
+
+		trustDomain, err := spiffeid.TrustDomainFromString(cfg.Authz.TrustDomain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse trust domain: %w", err)
+		}
+
+		// Add server options for SPIFFE mTLS
+		//nolint:contextcheck
+		serverOpts = append(serverOpts,
+			grpc.Creds(
+				grpccredentials.MTLSServerCredentials(x509Src, bundleSrc, tlsconfig.AuthorizeMemberOf(trustDomain)),
+			),
+			grpc.ChainUnaryInterceptor(unaryInterceptorFor(authInterceptor)),
+			grpc.ChainStreamInterceptor(streamInterceptorFor(authInterceptor)),
+		)
+	}
+
+	// Create a server
+	grpcServer := grpc.NewServer(serverOpts...)
+
+	// Register APIs
+	storev1.RegisterStoreServiceServer(grpcServer, controller.NewStoreController(storeAPI, databaseAPI))
+	routingv1.RegisterRoutingServiceServer(grpcServer, controller.NewRoutingController(routingAPI, storeAPI))
+	searchv1.RegisterSearchServiceServer(grpcServer, controller.NewSearchController(databaseAPI))
+	storev1.RegisterSyncServiceServer(grpcServer, controller.NewSyncController(databaseAPI, options))
+
+	// Register server
+	reflection.Register(grpcServer)
+
+	return &Server{
 		options:       options,
 		store:         storeAPI,
 		routing:       routingAPI,
 		database:      databaseAPI,
 		syncService:   syncService,
 		healthzServer: healthz.NewHealthServer(cfg.HealthCheckAddress),
-		grpcServer:    grpc.NewServer(),
-	}
-
-	// Register APIs
-	storev1.RegisterStoreServiceServer(server.grpcServer, controller.NewStoreController(storeAPI, databaseAPI))
-	routingv1.RegisterRoutingServiceServer(server.grpcServer, controller.NewRoutingController(routingAPI, storeAPI))
-	searchv1.RegisterSearchServiceServer(server.grpcServer, controller.NewSearchController(databaseAPI))
-	storev1.RegisterSyncServiceServer(server.grpcServer, controller.NewSyncController(databaseAPI, options))
-
-	// Register server
-	reflection.Register(server.grpcServer)
-
-	return server, nil
+		grpcServer:    grpcServer,
+	}, nil
 }
 
 func (s Server) Options() types.APIOptions { return s.options }
@@ -181,4 +227,37 @@ func (s Server) bootstrap(_ context.Context) error {
 	// TODO: bootstrap routing and storage data by listing from storage
 	// TODO: also update cache datastore
 	return nil
+}
+
+func authInterceptor(ctx context.Context) error {
+	sid, ok := grpccredentials.PeerIDFromContext(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "missing peer ID") //nolint:wrapcheck
+	}
+
+	logger.Debug("Authenticated peer", "peer_id", sid)
+
+	return nil
+}
+
+// TODO: this can be moved to utils and expanded.
+func unaryInterceptorFor(fn func(context.Context) error) func(context.Context, any, *grpc.UnaryServerInfo, grpc.UnaryHandler) (any, error) {
+	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if err := fn(ctx); err != nil {
+			return nil, err
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+// TODO: this can be moved to utils and expanded.
+func streamInterceptorFor(fn func(context.Context) error) func(any, grpc.ServerStream, *grpc.StreamServerInfo, grpc.StreamHandler) error {
+	return func(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if err := fn(ss.Context()); err != nil {
+			return err
+		}
+
+		return handler(srv, ss)
+	}
 }
