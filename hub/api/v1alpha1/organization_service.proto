@@ -15,7 +15,6 @@ import "saas/v1alpha1/organization.proto";
 import "saas/v1alpha1/user.proto";
 import "saas/v1alpha1/roles.proto";
 
-
 message ListOrganizationsRequest {
   PaginationParam pagination = 1;
 }
