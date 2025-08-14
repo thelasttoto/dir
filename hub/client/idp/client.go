@@ -19,7 +19,7 @@ const (
 	// Path to the IDP API for retreiving an AccessToken for ApiKey Access.
 	AccessTokenEndpoint = "/v1/token"
 	// Fixed Client ID for the access token request. THIS IS NOT THE CLIENT ID THAT WILL BE IN ACCESS TOKEN.
-	AccessTokenClientID = "0oackfvbjvy65qVi41d7" // TO DO: Why does need to be fixed? Should be configurable?
+	AccessTokenClientID = "0oackfvbjvy65qVi41d7"
 	// Scope for the access token request.
 	AccessTokenScope = "openid offline_access"
 	// Grant type for the access token request.

@@ -11,6 +11,7 @@ import (
 
 	hubBrowser "github.com/agntcy/dir/hub/auth/internal/browser"
 	"github.com/agntcy/dir/hub/auth/internal/webserver"
+	"github.com/agntcy/dir/hub/auth/internal/webserver/utils"
 	"github.com/agntcy/dir/hub/client/okta"
 	"github.com/agntcy/dir/hub/config"
 	"github.com/agntcy/dir/hub/sessionstore"
@@ -28,9 +29,15 @@ func Login(
 	oktaClient okta.Client,
 	currentSession *sessionstore.HubSession,
 ) (*sessionstore.HubSession, error) {
+	// Generate PKCE challenge and verifier
+	verifier, challenge := utils.GenerateChallenge()
+	webserverSession := &webserver.SessionStore{
+		Verifier:  verifier,
+		Challenge: challenge,
+	}
+
 	// Set up the webserver
 	errCh := make(chan error, 1)
-	webserverSession := &webserver.SessionStore{}
 
 	handler := webserver.NewHandler(&webserver.Config{
 		ClientID:           currentSession.AuthConfig.ClientID,
@@ -58,7 +65,7 @@ func Login(
 	defer server.Shutdown(ctx) //nolint:errcheck
 
 	// Open the browser
-	if err := hubBrowser.OpenBrowserForLogin(currentSession.AuthConfig); err != nil {
+	if err := hubBrowser.OpenBrowserForLogin(currentSession, webserverSession, oktaClient); err != nil {
 		return nil, fmt.Errorf("could not open browser for login: %w", err)
 	}
 
@@ -80,6 +87,7 @@ func Login(
 
 	// Set user
 	currentSession.User = user
+
 	// Set tokens
 	currentSession.Tokens = &sessionstore.Tokens{
 		AccessToken:  webserverSession.Tokens.AccessToken,

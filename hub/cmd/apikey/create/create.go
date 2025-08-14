@@ -15,19 +15,24 @@ import (
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	service "github.com/agntcy/dir/hub/service"
 	"github.com/agntcy/dir/hub/sessionstore"
+	"github.com/agntcy/dir/hub/utils/file"
 	"github.com/spf13/cobra"
 )
 
 // NewCommand creates the "create" command for the Agent apikey Hub CLI.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "create a new API key for hub actions",
-		Long: `create a new API key for hub actions.
+		Use:   "create --role <role> --org-name <org_name>",
+		Short: "create a new API key for hub actions in an organization, with specified role",
+		Long: `create a new API key for hub actions in an organization, with specified role.
+
+Parameters:
+  --role <role>          Role name. One of ['ROLE_ORG_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR', 'ROLE_VIEWER']
+  --org-name <org_name>  Organization Name
 
 Example:
-  # Create a new API key
-  dirctl hub apikey create --role PRODUCT_ROLE_ADMIN`,
+  # Create a new API key with role OrgAdmin for organization "MyOrg"
+  dirctl hub apikey create --role ROLE_ORG_ADMIN --org-name MyOrg`,
 	}
 
 	opts := options.NewApiKeyCreateOptions(hubOpts, cmd)
@@ -44,7 +49,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOpt
 		return errors.New("organization ID or name is required")
 	}
 	if opts.OrganizationId != "" {
-		fmt.Printf("Creating new API key with role: '%s' for org ID: '%s'\n", opts.Role, opts.OrganizationId)
+		fmt.Printf("Creating new API key with role: '%s' for org ID: '%s'...\n", opts.Role, opts.OrganizationId)
 		if opts.OrganizationName != "" {
 			// Org Id & name are both set, use ID preferentially.
 			opts.OrganizationName = ""
@@ -80,13 +85,24 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOpt
 		return fmt.Errorf("failed to create API key: %w", err)
 	}
 
-	fmt.Printf("API Key created successfully: %s\n", resp)
-
+	fmt.Printf("API Key created successfully:\n")
 	prettyModel, err := json.MarshalIndent(resp.Token, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal agent: %w", err)
 	}
-
 	fmt.Fprintf(os.Stdout, "%s\n", string(prettyModel))
+
+	currentSession.ApiKeyAccess = &sessionstore.ApiKey{
+		ClientID: resp.Token.ClientId,
+		Secret:   resp.Token.Secret,
+	}
+
+	// Save session with new api key
+	sessionStore := sessionstore.NewFileSessionStore(file.GetSessionFilePath())
+	if err := sessionStore.SaveHubSession(opts.ServerAddress, currentSession); err != nil {
+		return fmt.Errorf("failed to save tokens: %w", err)
+	}
+
+	fmt.Printf("The API Key has been added to your session file.\n")
 	return nil
 }
