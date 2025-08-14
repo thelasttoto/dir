@@ -41,11 +41,6 @@ func NewCommand(hubOptions *options.HubOptions) *cobra.Command {
 		if !ok || currentSession == nil {
 			return errors.New("failed to get current session from context")
 		}
-		//currentSession.AuthConfig.IdpFrontendAddress = "https://id.staging.eticloud.io"
-		//currentSession.AuthConfig.IdpBackendAddress = "https://api.id.staging.eticloud.io"
-		//currentSession.AuthConfig.IdpProductID = "0bc16ceb-80d9-4179-8849-ec8248882a35"
-		fmt.Printf("currentSession.AuthConfig.IdpIssuerAddress=%s\n", currentSession.AuthConfig.IdpIssuerAddress)
-		fmt.Printf("currentSession.AuthConfig.IdpFrontendAddress=%s\n", currentSession.AuthConfig.IdpFrontendAddress)
 		// Load session store for saving
 		sessionStore := sessionstore.NewFileSessionStore(file.GetSessionFilePath())
 		// Construct Okta client
@@ -91,7 +86,8 @@ func NewCommand(hubOptions *options.HubOptions) *cobra.Command {
 
 		loginSuccess = true
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in to Agent Hub\nAddress: %s\nUser: %s\n", opts.ServerAddress, updatedSession.User)
+		fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in to Agent Hub\nAddress: %s\nUser: %s\nClientID: %s\n",
+			opts.ServerAddress, updatedSession.User, updatedSession.AuthConfig.ClientID)
 
 		return nil
 	}

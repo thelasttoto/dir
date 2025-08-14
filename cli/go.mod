@@ -204,6 +204,7 @@ require (
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481 // indirect
 	github.com/nwaples/rardecode v1.1.3 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/okta/samples-golang v0.0.0-20240104153321-dc6cf32830d4 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/gomega v1.36.2 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect

@@ -13,7 +13,7 @@ import (
 	"github.com/agntcy/dir/hub/sessionstore"
 )
 
-// Logout logs the user out of the Agent Hub by revoking the current session's tokens and removing the session from the session store.
+// Logout logs the user out of the Agent Hub by revoking the current session's tokens.
 // It uses the provided Okta client to perform the logout operation and cleans up the session data.
 // Returns an error if the logout or session removal fails.
 func Logout(
@@ -26,8 +26,10 @@ func Logout(
 		return fmt.Errorf("failed to logout: %w", err)
 	}
 
-	if err := sessionStore.RemoveSession(opts.ServerAddress); err != nil {
-		return fmt.Errorf("failed to remove session: %w", err)
+	// Do not remove the full session because we need to keep apikey if any. Just remove access tokens.
+	currentSession.Tokens = &sessionstore.Tokens{}
+	if err := sessionStore.SaveHubSession(opts.ServerAddress, currentSession); err != nil {
+		return fmt.Errorf("failed to save tokens: %w", err)
 	}
 
 	return nil

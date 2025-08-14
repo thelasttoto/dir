@@ -21,19 +21,14 @@ func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete <apikey_id>",
 		Short: "delete an API key for hub action",
-		Long: `Pull an agent from the Agent Hub.
+		Long: `delete an API key for hub action.
 
 Parameters:
-  <agent_ref>    Agent reference in one of the following formats:
-                - sha256:<hash>    : Pull by digest
-                - <repo>:<version> : Pull by repository and version
+  <apikey_id>    API Key ID to delete
 
 Examples:
-  # Pull agent by digest
-  dirctl hub pull sha256:1234567890abcdef...
-
-  # Pull agent by repository and version
-  dirctl hub pull owner/repo-name:v1.0.0`,
+  # Delete API key
+  dirctl hub apikey delete f1a3c901-deba-40bc-8a7c-9f9b0a246b80`,
 	}
 	opts := options.NewApiKeyDeleteOptions(hubOpts)
 
