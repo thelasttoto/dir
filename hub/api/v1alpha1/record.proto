@@ -9,9 +9,10 @@ import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 import "saas/v1alpha1/category.proto";
 import "saas/v1alpha1/mcp.proto";
+import "saas/v1alpha1/a2a.proto";
 import "buf/validate/validate.proto";
 
-message Agent {
+message Record {
   string id = 1;
 
   google.protobuf.Timestamp created_at = 2;
@@ -39,4 +40,7 @@ message Agent {
 
   // Mcp related field
   optional Mcp mcp = 20;
+  
+  // A2A related field
+  optional A2A a2a = 21;
 }

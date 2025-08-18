@@ -109,7 +109,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 		}
 
 		switch parsedRepo := repository.(type) {
-		case *v1alpha1.PushAgentRequest_RepositoryName:
+		case *v1alpha1.PushRecordRequest_RepositoryName:
 			msg.Repository = parsedRepo
 			if parsedRepo.RepositoryName != parsedAgent.Name {
 				return nil, fmt.Errorf("repository name mismatch: expected %s, got %s", parsedAgent.Name, parsedRepo.RepositoryName)
@@ -118,7 +118,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse organization name from repository: %w", err)
 			}
-		case *v1alpha1.PushAgentRequest_RepositoryId:
+		case *v1alpha1.PushRecordRequest_RepositoryId:
 			msg.Repository = parsedRepo
 			// In this case, we read the organization name from the agent
 			msg.OrganizationName, err = GetOrganizationNameFromRepository(parsedAgent.Name)

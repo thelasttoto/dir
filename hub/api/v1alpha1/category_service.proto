@@ -7,7 +7,6 @@ option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "saas/v1alpha1/category.proto";
-import "saas/v1alpha1/oasf_category.proto";
 
 message ListCategoriesRequest {}
 
@@ -15,21 +14,8 @@ message ListCategoriesResponse {
   repeated Category categories = 1;
 }
 
-message SyncCategoriesRequest {
-  map<string, OasfAttribute> attributes = 1 [(buf.validate.field).map.min_pairs = 1];
-}
-
-message SyncCategoriesResponse {}
-
 service CategoryService {
   rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse) {
     option (google.api.http) = {get: "/v1alpha1/categories"};
-  }
-
-  rpc SyncCategories(SyncCategoriesRequest) returns (SyncCategoriesResponse) {
-    option (google.api.http) = {
-      post: "/v1alpha1/categories/sync"
-      body: "*"
-    };
   }
 }
