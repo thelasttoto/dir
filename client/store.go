@@ -200,78 +200,39 @@ func (c *Client) PullBatch(ctx context.Context, recordRefs []*corev1.RecordRef) 
 	return records, nil
 }
 
-// PushWithOptions sends a record with optional OCI artifacts like signatures to the store.
-func (c *Client) PushWithOptions(ctx context.Context, record *corev1.Record, signature *signv1.Signature) (*storev1.PushWithOptionsResponse, error) {
+// PushSignatureReferrer stores a signature using the PushReferrer RPC.
+func (c *Client) PushSignatureReferrer(ctx context.Context, recordCID string, signature *signv1.Signature) error {
 	// Create streaming client
-	stream, err := c.StoreServiceClient.PushWithOptions(ctx)
+	stream, err := c.StoreServiceClient.PushReferrer(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create push with options stream: %w", err)
+		return fmt.Errorf("failed to create push referrer stream: %w", err)
 	}
 
-	// Create push options
-	options := &storev1.PushOptions{
-		Signature: signature,
+	// Create the push referrer request
+	req := &storev1.PushReferrerRequest{
+		RecordRef: &corev1.RecordRef{
+			Cid: recordCID,
+		},
+		Options: &storev1.PushReferrerRequest_Signature{
+			Signature: signature,
+		},
 	}
 
-	// Create request
-	request := &storev1.PushWithOptionsRequest{
-		Record:  record,
-		Options: options,
-	}
-
-	// Send request
-	if err := stream.Send(request); err != nil {
-		return nil, fmt.Errorf("failed to send push with options request: %w", err)
+	// Send the request
+	if err := stream.Send(req); err != nil {
+		return fmt.Errorf("failed to send push referrer request: %w", err)
 	}
 
 	// Close send stream
 	if err := stream.CloseSend(); err != nil {
-		return nil, fmt.Errorf("failed to close send stream: %w", err)
+		return fmt.Errorf("failed to close send stream: %w", err)
 	}
 
 	// Receive response
-	response, err := stream.Recv()
+	_, err = stream.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("failed to receive push with options response: %w", err)
+		return fmt.Errorf("failed to receive push referrer response: %w", err)
 	}
 
-	return response, nil
-}
-
-// PullWithOptions retrieves a record along with its associated OCI artifacts.
-func (c *Client) PullWithOptions(ctx context.Context, recordRef *corev1.RecordRef, includeSignature bool) (*storev1.PullWithOptionsResponse, error) {
-	// Create streaming client
-	stream, err := c.StoreServiceClient.PullWithOptions(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pull with options stream: %w", err)
-	}
-
-	// Create pull options
-	options := &storev1.PullOptions{
-		IncludeSignature: includeSignature,
-	}
-
-	// Create request
-	request := &storev1.PullWithOptionsRequest{
-		RecordRef: recordRef,
-		Options:   options,
-	}
-
-	// Send request
-	if err := stream.Send(request); err != nil {
-		return nil, fmt.Errorf("failed to send pull with options request: %w", err)
-	}
-
-	// Close send stream
-	if err := stream.CloseSend(); err != nil {
-		return nil, fmt.Errorf("failed to close send stream: %w", err)
-	}
-
-	// Receive response
-	response, err := stream.Recv()
-	if err != nil {
-		return nil, fmt.Errorf("failed to receive pull with options response: %w", err)
-	}
-
-	return response, nil
+	return nil
 }
