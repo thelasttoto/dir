@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: saas/v1alpha1/agent_dir_service.proto
+// source: saas/v1alpha1/record_dir_service.proto
 
 package saasv1alpha1
 
@@ -19,18 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	AgentDirService_PushAgent_FullMethodName = "/saas.v1alpha1.AgentDirService/PushAgent"
-	AgentDirService_PullAgent_FullMethodName = "/saas.v1alpha1.AgentDirService/PullAgent"
+	AgentDirService_PushRecord_FullMethodName = "/saas.v1alpha1.AgentDirService/PushRecord"
+	AgentDirService_PullRecord_FullMethodName = "/saas.v1alpha1.AgentDirService/PullRecord"
 )
 
 // AgentDirServiceClient is the client API for AgentDirService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// This API is manily for CLIs and the implementation of these APIs should communicate with the Agent Directory
+// This API is primarily intended for use by CLI tools. Implementations of these APIs should interact with the Agent Directory service to perform their operations.
 type AgentDirServiceClient interface {
-	PushAgent(ctx context.Context, opts ...grpc.CallOption) (AgentDirService_PushAgentClient, error)
-	PullAgent(ctx context.Context, in *PullAgentRequest, opts ...grpc.CallOption) (AgentDirService_PullAgentClient, error)
+	PushRecord(ctx context.Context, opts ...grpc.CallOption) (AgentDirService_PushRecordClient, error)
+	PullRecord(ctx context.Context, in *PullRecordRequest, opts ...grpc.CallOption) (AgentDirService_PullRecordClient, error)
 }
 
 type agentDirServiceClient struct {
@@ -41,48 +41,48 @@ func NewAgentDirServiceClient(cc grpc.ClientConnInterface) AgentDirServiceClient
 	return &agentDirServiceClient{cc}
 }
 
-func (c *agentDirServiceClient) PushAgent(ctx context.Context, opts ...grpc.CallOption) (AgentDirService_PushAgentClient, error) {
+func (c *agentDirServiceClient) PushRecord(ctx context.Context, opts ...grpc.CallOption) (AgentDirService_PushRecordClient, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AgentDirService_ServiceDesc.Streams[0], AgentDirService_PushAgent_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AgentDirService_ServiceDesc.Streams[0], AgentDirService_PushRecord_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &agentDirServicePushAgentClient{ClientStream: stream}
+	x := &agentDirServicePushRecordClient{ClientStream: stream}
 	return x, nil
 }
 
-type AgentDirService_PushAgentClient interface {
-	Send(*PushAgentRequest) error
-	CloseAndRecv() (*PushAgentResponse, error)
+type AgentDirService_PushRecordClient interface {
+	Send(*PushRecordRequest) error
+	CloseAndRecv() (*PushRecordResponse, error)
 	grpc.ClientStream
 }
 
-type agentDirServicePushAgentClient struct {
+type agentDirServicePushRecordClient struct {
 	grpc.ClientStream
 }
 
-func (x *agentDirServicePushAgentClient) Send(m *PushAgentRequest) error {
+func (x *agentDirServicePushRecordClient) Send(m *PushRecordRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *agentDirServicePushAgentClient) CloseAndRecv() (*PushAgentResponse, error) {
+func (x *agentDirServicePushRecordClient) CloseAndRecv() (*PushRecordResponse, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(PushAgentResponse)
+	m := new(PushRecordResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *agentDirServiceClient) PullAgent(ctx context.Context, in *PullAgentRequest, opts ...grpc.CallOption) (AgentDirService_PullAgentClient, error) {
+func (c *agentDirServiceClient) PullRecord(ctx context.Context, in *PullRecordRequest, opts ...grpc.CallOption) (AgentDirService_PullRecordClient, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AgentDirService_ServiceDesc.Streams[1], AgentDirService_PullAgent_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AgentDirService_ServiceDesc.Streams[1], AgentDirService_PullRecord_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &agentDirServicePullAgentClient{ClientStream: stream}
+	x := &agentDirServicePullRecordClient{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -92,17 +92,17 @@ func (c *agentDirServiceClient) PullAgent(ctx context.Context, in *PullAgentRequ
 	return x, nil
 }
 
-type AgentDirService_PullAgentClient interface {
-	Recv() (*PullAgentResponse, error)
+type AgentDirService_PullRecordClient interface {
+	Recv() (*PullRecordResponse, error)
 	grpc.ClientStream
 }
 
-type agentDirServicePullAgentClient struct {
+type agentDirServicePullRecordClient struct {
 	grpc.ClientStream
 }
 
-func (x *agentDirServicePullAgentClient) Recv() (*PullAgentResponse, error) {
-	m := new(PullAgentResponse)
+func (x *agentDirServicePullRecordClient) Recv() (*PullRecordResponse, error) {
+	m := new(PullRecordResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -113,10 +113,10 @@ func (x *agentDirServicePullAgentClient) Recv() (*PullAgentResponse, error) {
 // All implementations should embed UnimplementedAgentDirServiceServer
 // for forward compatibility.
 //
-// This API is manily for CLIs and the implementation of these APIs should communicate with the Agent Directory
+// This API is primarily intended for use by CLI tools. Implementations of these APIs should interact with the Agent Directory service to perform their operations.
 type AgentDirServiceServer interface {
-	PushAgent(AgentDirService_PushAgentServer) error
-	PullAgent(*PullAgentRequest, AgentDirService_PullAgentServer) error
+	PushRecord(AgentDirService_PushRecordServer) error
+	PullRecord(*PullRecordRequest, AgentDirService_PullRecordServer) error
 }
 
 // UnimplementedAgentDirServiceServer should be embedded to have
@@ -126,11 +126,11 @@ type AgentDirServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentDirServiceServer struct{}
 
-func (UnimplementedAgentDirServiceServer) PushAgent(AgentDirService_PushAgentServer) error {
-	return status.Errorf(codes.Unimplemented, "method PushAgent not implemented")
+func (UnimplementedAgentDirServiceServer) PushRecord(AgentDirService_PushRecordServer) error {
+	return status.Errorf(codes.Unimplemented, "method PushRecord not implemented")
 }
-func (UnimplementedAgentDirServiceServer) PullAgent(*PullAgentRequest, AgentDirService_PullAgentServer) error {
-	return status.Errorf(codes.Unimplemented, "method PullAgent not implemented")
+func (UnimplementedAgentDirServiceServer) PullRecord(*PullRecordRequest, AgentDirService_PullRecordServer) error {
+	return status.Errorf(codes.Unimplemented, "method PullRecord not implemented")
 }
 func (UnimplementedAgentDirServiceServer) testEmbeddedByValue() {}
 
@@ -152,50 +152,50 @@ func RegisterAgentDirServiceServer(s grpc.ServiceRegistrar, srv AgentDirServiceS
 	s.RegisterService(&AgentDirService_ServiceDesc, srv)
 }
 
-func _AgentDirService_PushAgent_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AgentDirServiceServer).PushAgent(&agentDirServicePushAgentServer{ServerStream: stream})
+func _AgentDirService_PushRecord_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(AgentDirServiceServer).PushRecord(&agentDirServicePushRecordServer{ServerStream: stream})
 }
 
-type AgentDirService_PushAgentServer interface {
-	SendAndClose(*PushAgentResponse) error
-	Recv() (*PushAgentRequest, error)
+type AgentDirService_PushRecordServer interface {
+	SendAndClose(*PushRecordResponse) error
+	Recv() (*PushRecordRequest, error)
 	grpc.ServerStream
 }
 
-type agentDirServicePushAgentServer struct {
+type agentDirServicePushRecordServer struct {
 	grpc.ServerStream
 }
 
-func (x *agentDirServicePushAgentServer) SendAndClose(m *PushAgentResponse) error {
+func (x *agentDirServicePushRecordServer) SendAndClose(m *PushRecordResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *agentDirServicePushAgentServer) Recv() (*PushAgentRequest, error) {
-	m := new(PushAgentRequest)
+func (x *agentDirServicePushRecordServer) Recv() (*PushRecordRequest, error) {
+	m := new(PushRecordRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func _AgentDirService_PullAgent_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(PullAgentRequest)
+func _AgentDirService_PullRecord_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PullRecordRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(AgentDirServiceServer).PullAgent(m, &agentDirServicePullAgentServer{ServerStream: stream})
+	return srv.(AgentDirServiceServer).PullRecord(m, &agentDirServicePullRecordServer{ServerStream: stream})
 }
 
-type AgentDirService_PullAgentServer interface {
-	Send(*PullAgentResponse) error
+type AgentDirService_PullRecordServer interface {
+	Send(*PullRecordResponse) error
 	grpc.ServerStream
 }
 
-type agentDirServicePullAgentServer struct {
+type agentDirServicePullRecordServer struct {
 	grpc.ServerStream
 }
 
-func (x *agentDirServicePullAgentServer) Send(m *PullAgentResponse) error {
+func (x *agentDirServicePullRecordServer) Send(m *PullRecordResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -208,15 +208,15 @@ var AgentDirService_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "PushAgent",
-			Handler:       _AgentDirService_PushAgent_Handler,
+			StreamName:    "PushRecord",
+			Handler:       _AgentDirService_PushRecord_Handler,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "PullAgent",
-			Handler:       _AgentDirService_PullAgent_Handler,
+			StreamName:    "PullRecord",
+			Handler:       _AgentDirService_PullRecord_Handler,
 			ServerStreams: true,
 		},
 	},
-	Metadata: "saas/v1alpha1/agent_dir_service.proto",
+	Metadata: "saas/v1alpha1/record_dir_service.proto",
 }

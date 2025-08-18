@@ -26,9 +26,9 @@ const chunkSize = 4096 // 4KB
 // Client defines the interface for interacting with the Agent Hub backend for agent operations.
 type Client interface {
 	// PushAgent uploads an agent to the hub and returns the response or an error.
-	PushAgent(ctx context.Context, agent []byte, repository any) (*v1alpha1.PushAgentResponse, error)
+	PushAgent(ctx context.Context, agent []byte, repository any) (*v1alpha1.PushRecordResponse, error)
 	// PullAgent downloads an agent from the hub and returns the agent data or an error.
-	PullAgent(ctx context.Context, request *v1alpha1.PullAgentRequest) ([]byte, error)
+	PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequest) ([]byte, error)
 	// CreateAPIKey creates an API key for the specified role and returns the (clientId, secret) or an error.
 	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error)
 	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
@@ -65,7 +65,7 @@ func New(serverAddr string) (*client, error) { //nolint:revive
 }
 
 // PushAgent uploads an agent to the hub in chunks and returns the response or an error.
-func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*v1alpha1.PushAgentResponse, error) {
+func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*v1alpha1.PushRecordResponse, error) {
 	var parsedAgent *corev1alpha1.Agent
 	if err := json.Unmarshal(agent, &parsedAgent); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal agent: %w", err)
@@ -81,7 +81,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 		Annotations: parsedAgent.GetAnnotations(),
 	}
 
-	stream, err := c.AgentDirServiceClient.PushAgent(ctx)
+	stream, err := c.AgentDirServiceClient.PushRecord(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create push stream: %w", err)
 	}
@@ -101,7 +101,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 			break
 		}
 
-		msg := &v1alpha1.PushAgentRequest{
+		msg := &v1alpha1.PushRecordRequest{
 			Model: &corev1alpha1.Object{
 				Data: buf[:n],
 				Ref:  ref,
@@ -109,7 +109,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 		}
 
 		switch parsedRepo := repository.(type) {
-		case *v1alpha1.PushAgentRequest_RepositoryName:
+		case *v1alpha1.PushRecordRequest_RepositoryName:
 			msg.Repository = parsedRepo
 			if parsedRepo.RepositoryName != parsedAgent.Name {
 				return nil, fmt.Errorf("repository name mismatch: expected %s, got %s", parsedAgent.Name, parsedRepo.RepositoryName)
@@ -118,7 +118,7 @@ func (c *client) PushAgent(ctx context.Context, agent []byte, repository any) (*
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse organization name from repository: %w", err)
 			}
-		case *v1alpha1.PushAgentRequest_RepositoryId:
+		case *v1alpha1.PushRecordRequest_RepositoryId:
 			msg.Repository = parsedRepo
 			// In this case, we read the organization name from the agent
 			msg.OrganizationName, err = GetOrganizationNameFromRepository(parsedAgent.Name)
@@ -151,8 +151,8 @@ func GetOrganizationNameFromRepository(repository string) (string, error) {
 }
 
 // PullAgent downloads an agent from the hub in chunks and returns the agent data or an error.
-func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullAgentRequest) ([]byte, error) {
-	stream, err := c.AgentDirServiceClient.PullAgent(ctx, request)
+func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequest) ([]byte, error) {
+	stream, err := c.AgentDirServiceClient.PullRecord(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pull stream: %w", err)
 	}
@@ -160,7 +160,7 @@ func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullAgentReque
 	var buffer bytes.Buffer
 
 	for {
-		var chunk *v1alpha1.PullAgentResponse
+		var chunk *v1alpha1.PullRecordResponse
 
 		chunk, err = stream.Recv()
 		if errors.Is(err, io.EOF) {

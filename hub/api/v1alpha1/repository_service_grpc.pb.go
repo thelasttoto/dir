@@ -21,7 +21,7 @@ const _ = grpc.SupportPackageIsVersion8
 const (
 	RepositoryService_ListRepositories_FullMethodName = "/saas.v1alpha1.RepositoryService/ListRepositories"
 	RepositoryService_GetRepository_FullMethodName    = "/saas.v1alpha1.RepositoryService/GetRepository"
-	RepositoryService_ListAgents_FullMethodName       = "/saas.v1alpha1.RepositoryService/ListAgents"
+	RepositoryService_ListRecords_FullMethodName      = "/saas.v1alpha1.RepositoryService/ListRecords"
 	RepositoryService_CreateRepository_FullMethodName = "/saas.v1alpha1.RepositoryService/CreateRepository"
 	RepositoryService_UpdateRepository_FullMethodName = "/saas.v1alpha1.RepositoryService/UpdateRepository"
 	RepositoryService_DeleteRepository_FullMethodName = "/saas.v1alpha1.RepositoryService/DeleteRepository"
@@ -33,7 +33,7 @@ const (
 type RepositoryServiceClient interface {
 	ListRepositories(ctx context.Context, in *ListRepositoriesRequest, opts ...grpc.CallOption) (*ListRepositoriesResponse, error)
 	GetRepository(ctx context.Context, in *GetRepositoryRequest, opts ...grpc.CallOption) (*GetRepositoryResponse, error)
-	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+	ListRecords(ctx context.Context, in *ListRecordsRequest, opts ...grpc.CallOption) (*ListRecordsResponse, error)
 	CreateRepository(ctx context.Context, in *CreateRepositoryRequest, opts ...grpc.CallOption) (*CreateRepositoryResponse, error)
 	UpdateRepository(ctx context.Context, in *UpdateRepositoryRequest, opts ...grpc.CallOption) (*UpdateRepositoryResponse, error)
 	DeleteRepository(ctx context.Context, in *DeleteRepositoryRequest, opts ...grpc.CallOption) (*DeleteRepositoryResponse, error)
@@ -67,10 +67,10 @@ func (c *repositoryServiceClient) GetRepository(ctx context.Context, in *GetRepo
 	return out, nil
 }
 
-func (c *repositoryServiceClient) ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error) {
+func (c *repositoryServiceClient) ListRecords(ctx context.Context, in *ListRecordsRequest, opts ...grpc.CallOption) (*ListRecordsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListAgentsResponse)
-	err := c.cc.Invoke(ctx, RepositoryService_ListAgents_FullMethodName, in, out, cOpts...)
+	out := new(ListRecordsResponse)
+	err := c.cc.Invoke(ctx, RepositoryService_ListRecords_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (c *repositoryServiceClient) DeleteRepository(ctx context.Context, in *Dele
 type RepositoryServiceServer interface {
 	ListRepositories(context.Context, *ListRepositoriesRequest) (*ListRepositoriesResponse, error)
 	GetRepository(context.Context, *GetRepositoryRequest) (*GetRepositoryResponse, error)
-	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
+	ListRecords(context.Context, *ListRecordsRequest) (*ListRecordsResponse, error)
 	CreateRepository(context.Context, *CreateRepositoryRequest) (*CreateRepositoryResponse, error)
 	UpdateRepository(context.Context, *UpdateRepositoryRequest) (*UpdateRepositoryResponse, error)
 	DeleteRepository(context.Context, *DeleteRepositoryRequest) (*DeleteRepositoryResponse, error)
@@ -132,8 +132,8 @@ func (UnimplementedRepositoryServiceServer) ListRepositories(context.Context, *L
 func (UnimplementedRepositoryServiceServer) GetRepository(context.Context, *GetRepositoryRequest) (*GetRepositoryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRepository not implemented")
 }
-func (UnimplementedRepositoryServiceServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAgents not implemented")
+func (UnimplementedRepositoryServiceServer) ListRecords(context.Context, *ListRecordsRequest) (*ListRecordsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRecords not implemented")
 }
 func (UnimplementedRepositoryServiceServer) CreateRepository(context.Context, *CreateRepositoryRequest) (*CreateRepositoryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateRepository not implemented")
@@ -200,20 +200,20 @@ func _RepositoryService_GetRepository_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RepositoryService_ListAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAgentsRequest)
+func _RepositoryService_ListRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRecordsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RepositoryServiceServer).ListAgents(ctx, in)
+		return srv.(RepositoryServiceServer).ListRecords(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RepositoryService_ListAgents_FullMethodName,
+		FullMethod: RepositoryService_ListRecords_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RepositoryServiceServer).ListAgents(ctx, req.(*ListAgentsRequest))
+		return srv.(RepositoryServiceServer).ListRecords(ctx, req.(*ListRecordsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -288,8 +288,8 @@ var RepositoryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RepositoryService_GetRepository_Handler,
 		},
 		{
-			MethodName: "ListAgents",
-			Handler:    _RepositoryService_ListAgents_Handler,
+			MethodName: "ListRecords",
+			Handler:    _RepositoryService_ListRecords_Handler,
 		},
 		{
 			MethodName: "CreateRepository",

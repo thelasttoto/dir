@@ -7,7 +7,7 @@ option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/field_behavior.proto";
-import "saas/v1alpha1/agent.proto";
+import "saas/v1alpha1/record.proto";
 import "saas/v1alpha1/category.proto";
 
 message Repository {
@@ -27,8 +27,9 @@ message Repository {
   string organization_id = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
   bool private = 11;
 
-  repeated Agent agents = 12;
+  repeated Record records = 12;
   repeated Category categories = 13;
+  string repo_type = 14;
 
   option (buf.validate.message).cel = {
     id: "updated_at.not_less_than.created_at"
