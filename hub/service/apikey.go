@@ -50,3 +50,21 @@ func DeleteAPIKey(
 
 	return resp, nil
 }
+
+// CreateAPIKey creates a new API key in the hub and returns the response.
+// It uses the provided session for authentication.
+func ListAPIKeys(
+	ctx context.Context,
+	hc hubClient.Client,
+	organizationId string,
+	session *sessionstore.HubSession,
+) (*v1alpha1.ListApiKeyResponse, error) {
+	ctx = auth.AddAuthToContext(ctx, session)
+
+	resp, err := hc.ListAPIKeys(ctx, nil, organizationId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list API keys: %w", err)
+	}
+
+	return resp, nil
+}

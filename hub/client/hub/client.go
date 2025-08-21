@@ -33,6 +33,8 @@ type Client interface {
 	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error)
 	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
 	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error)
+	// ListAPIKeys lists all API keys for a specific organization and returns the response or an error.
+	ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organizationId string) (*v1alpha1.ListApiKeyResponse, error)
 }
 
 // client implements the Client interface for the Agent Hub backend.
@@ -215,6 +217,22 @@ func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSess
 	}
 	if resp == nil {
 		return nil, fmt.Errorf("received nil response from delete api key")
+	}
+
+	return resp, nil
+}
+
+func (c *client) ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organizationId string) (*v1alpha1.ListApiKeyResponse, error) {
+	req := &v1alpha1.ListApiKeyRequest{
+		OrganizationId: organizationId,
+	}
+
+	resp, err := c.ApiKeyServiceClient.ListApiKey(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list API keys: %w", err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("received nil response from list api keys")
 	}
 
 	return resp, nil

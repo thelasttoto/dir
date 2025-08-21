@@ -7,6 +7,7 @@ package apikey
 import (
 	"github.com/agntcy/dir/hub/cmd/apikey/create"
 	"github.com/agntcy/dir/hub/cmd/apikey/delete"
+	"github.com/agntcy/dir/hub/cmd/apikey/list"
 	"github.com/agntcy/dir/hub/cmd/options"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,7 @@ func NewCommand(hubOpts *options.HubOptions) *cobra.Command {
 	cmd.AddCommand(
 		create.NewCommand(hubOpts),
 		delete.NewCommand(hubOpts),
+		list.NewCommand(hubOpts),
 	)
 
 	return cmd

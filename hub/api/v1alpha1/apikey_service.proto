@@ -9,6 +9,8 @@ import "core/v1alpha1/object.proto";
 import "google/api/annotations.proto";
 import "saas/v1alpha1/apikey.proto";
 import "saas/v1alpha1/roles.proto";
+import "saas/v1alpha1/paginated_response.proto";
+import "saas/v1alpha1/pagination_param.proto";
 
 message CreateApiKeyRequest {
   Role role = 1;
@@ -25,6 +27,16 @@ message DeleteApiKeyRequest {
 
 message DeleteApiKeyResponse {}
 
+message ListApiKeyRequest {
+  string organization_id = 1;
+  PaginationParam pagination = 2;
+}
+
+message ListApiKeyResponse {
+  PaginatedResponse paginated_response = 1;
+  repeated ApiKey apikeys = 2;
+}
+
 service ApiKeyService {
   rpc CreateAPIKey(CreateApiKeyRequest) returns (stream CreateApiKeyResponse) {
     option (google.api.http) = {post: "/v1alpha1/agents/apikey"};
@@ -32,6 +44,10 @@ service ApiKeyService {
 
   rpc DeleteAPIKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse) {
     option (google.api.http) = {delete: "/v1alpha1/agents/apikey/{id}"};
+  }
+
+  rpc ListApiKey(ListApiKeyRequest) returns (ListApiKeyResponse) {
+    option (google.api.http) = {get: "/v1alpha1/apikeys"};
   }
 
 }
