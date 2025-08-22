@@ -1,4 +1,4 @@
-package auth
+package utils
 
 import (
 	"context"
@@ -23,4 +23,15 @@ func AddAuthToContext(ctx context.Context, session *sessionstore.HubSession) con
 	}
 
 	return ctx
+}
+
+func IsIAMAuthConfig(currentSession *sessionstore.HubSession) bool {
+	if currentSession == nil || currentSession.AuthConfig == nil {
+		return false
+	}
+	if currentSession.AuthConfig.IdpFrontendAddress != "" && currentSession.AuthConfig.IdpBackendAddress != "" {
+		return true
+	}
+
+	return false
 }

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
-	"github.com/agntcy/dir/hub/auth"
+	authUtils "github.com/agntcy/dir/hub/auth/utils"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/google/uuid"
@@ -25,7 +25,7 @@ func PullAgent(
 	agentID *v1alpha1.RecordIdentifier,
 	session *sessionstore.HubSession,
 ) ([]byte, error) {
-	ctx = auth.AddAuthToContext(ctx, session)
+	ctx = authUtils.AddAuthToContext(ctx, session)
 
 	model, err := hc.PullAgent(ctx, &v1alpha1.PullRecordRequest{
 		Id: agentID,
@@ -104,7 +104,7 @@ func PushAgent(
 	repository any,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.PushRecordResponse, error) {
-	ctx = auth.AddAuthToContext(ctx, session)
+	ctx = authUtils.AddAuthToContext(ctx, session)
 
 	resp, err := hc.PushAgent(ctx, agentBytes, repository)
 	if err != nil {

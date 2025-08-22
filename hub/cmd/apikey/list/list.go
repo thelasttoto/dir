@@ -75,6 +75,12 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptio
 	}
 
 	fmt.Printf("API Keys for organization %s:\n", opts.OrganizationId)
+
+	if resp == nil || len(resp.Apikeys) == 0 {
+		fmt.Println("No API keys found.")
+		return nil
+	}
+
 	prettyModel, err := json.MarshalIndent(resp.Apikeys, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal agent: %w", err)

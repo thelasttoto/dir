@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/agntcy/dir/hub/auth/utils"
 	"github.com/agntcy/dir/hub/client/idp"
 	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/agntcy/dir/hub/utils/file"
@@ -21,9 +22,18 @@ func RefreshApiKeyAccessToken(ctx context.Context, session *sessionstore.HubSess
 
 	idpClient := idp.NewClient(session.AuthConfig.IdpIssuerAddress, httpUtils.CreateSecureHTTPClient())
 
-	idpResp, err := idpClient.GetAccessTokenFromOkta(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
-	if err != nil {
-		return fmt.Errorf("failed to refresh API key access token: %w", err)
+	var idpResp *idp.GetAccessTokenResponse
+	var err error
+	if utils.IsIAMAuthConfig(session) {
+		idpResp, err = idpClient.GetAccessTokenFromApiKey(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
+		if err != nil {
+			return fmt.Errorf("failed to refresh API key access token: %w", err)
+		}
+	} else {
+		idpResp, err = idpClient.GetAccessTokenFromOkta(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
+		if err != nil {
+			return fmt.Errorf("failed to refresh API key access token: %w", err)
+		}
 	}
 
 	session.ApiKeyAccessToken = &sessionstore.Tokens{
