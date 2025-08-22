@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/agntcy/dir/hub/auth/internal/webserver"
+	authUtils "github.com/agntcy/dir/hub/auth/utils"
 	"github.com/agntcy/dir/hub/client/okta"
 	"github.com/agntcy/dir/hub/config"
 	"github.com/agntcy/dir/hub/sessionstore"
@@ -27,7 +28,7 @@ func OpenBrowserForLogin(currentSession *sessionstore.HubSession, webserverSessi
 
 	params := url.Values{}
 	loginPageWithRedirect := ""
-	if isIAMAuthConfig(currentSession) {
+	if authUtils.IsIAMAuthConfig(currentSession) {
 		params.Add("redirectUri", fmt.Sprintf("http://localhost:%d", config.LocalWebserverPort))
 		loginPageWithRedirect = fmt.Sprintf("%s/%s/%s?%s", currentSession.AuthConfig.IdpFrontendAddress, currentSession.AuthConfig.IdpProductID, loginPath, params.Encode())
 	} else {
@@ -45,6 +46,7 @@ func OpenBrowserForLogin(currentSession *sessionstore.HubSession, webserverSessi
 	return browser.OpenURL(loginPageWithRedirect) //nolint:wrapcheck
 }
 
+/*
 func isIAMAuthConfig(currentSession *sessionstore.HubSession) bool {
 	if currentSession == nil || currentSession.AuthConfig == nil {
 		return false
@@ -55,3 +57,4 @@ func isIAMAuthConfig(currentSession *sessionstore.HubSession) bool {
 
 	return false
 }
+*/

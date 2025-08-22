@@ -13,6 +13,7 @@ import (
 
 	saasv1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	auth "github.com/agntcy/dir/hub/auth"
+	authUtils "github.com/agntcy/dir/hub/auth/utils"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	"github.com/agntcy/dir/hub/sessionstore"
@@ -78,7 +79,7 @@ func newListCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 			return fmt.Errorf("failed to create hub client: %w", err)
 		}
 
-		ctx := auth.AddAuthToContext(cmd.Context(), currentSession)
+		ctx := authUtils.AddAuthToContext(cmd.Context(), currentSession)
 
 		orgs, err := hc.ListOrganizations(ctx, &saasv1alpha1.ListOrganizationsRequest{})
 		if err != nil {
@@ -135,7 +136,7 @@ Examples:
 			return fmt.Errorf("failed to create hub client: %w", err)
 		}
 
-		ctx := auth.AddAuthToContext(cmd.Context(), currentSession)
+		ctx := authUtils.AddAuthToContext(cmd.Context(), currentSession)
 
 		if !isOrganizationNameValid(orgName) {
 			return errors.New("invalid organization name format. 'name' must include only lowercase letters, digits, underscores or hyphens. Examples: my-org, my_org")

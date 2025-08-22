@@ -10,6 +10,7 @@ import (
 
 	saasv1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	auth "github.com/agntcy/dir/hub/auth"
+	authUtils "github.com/agntcy/dir/hub/auth/utils"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/client/okta"
 	"github.com/agntcy/dir/hub/cmd/options"
@@ -56,7 +57,7 @@ func NewCommand(hubOptions *options.HubOptions) *cobra.Command {
 			return fmt.Errorf("failed to create hub client: %w", err)
 		}
 
-		ctx := auth.AddAuthToContext(cmd.Context(), updatedSession)
+		ctx := authUtils.AddAuthToContext(cmd.Context(), updatedSession)
 
 		var loginSuccess bool
 		defer func() {
