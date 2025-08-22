@@ -83,3 +83,10 @@ func CalculateDigest(data []byte) (ocidigest.Digest, error) {
 	// Create OCI digest
 	return ocidigest.NewDigestFromBytes(ocidigest.SHA256, hash[:]), nil
 }
+
+// IsValidCID validates a CID string.
+func IsValidCID(cidString string) bool {
+	_, err := cid.Decode(cidString)
+
+	return err == nil
+}
