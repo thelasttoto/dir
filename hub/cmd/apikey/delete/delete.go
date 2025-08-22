@@ -19,12 +19,12 @@ import (
 // NewCommand creates the "delete" command for the Agent apikey Hub CLI.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete <apikey_id>",
+		Use:   "delete <client_id>",
 		Short: "delete an API key for hub action",
 		Long: `delete an API key for hub action.
 
 Parameters:
-  <apikey_id>    API Key ID to delete
+  <client_id>    Client ID of the API key to delete
 
 Examples:
   # Delete API key
@@ -41,12 +41,12 @@ Examples:
 
 func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyDeleteOptions) error {
 	if len(args) != 1 {
-		return errors.New("API Key ID is the only required argument")
+		return errors.New("API Key Client ID is the only required argument")
 	}
 
-	// Retreive the API key ID to delete from the command arguments
-	apiKeyId := args[0]
-	fmt.Printf("Deleting API key with ID: %s\n", apiKeyId)
+	// Retreive the API key Client ID to delete from the command arguments
+	clientId := args[0]
+	fmt.Printf("Deleting API key with Client ID: %s\n", clientId)
 
 	// Retrieve session from context
 	ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
@@ -70,11 +70,11 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyDeleteOpt
 		return fmt.Errorf("failed to create hub client: %w", err)
 	}
 
-	_, err = service.DeleteAPIKey(cmd.Context(), hc, apiKeyId, currentSession)
+	_, err = service.DeleteAPIKey(cmd.Context(), hc, clientId, currentSession)
 	if err != nil {
-		return fmt.Errorf("failed to create API key: %w", err)
+		return fmt.Errorf("failed to delete API key: %w", err)
 	}
-	fmt.Printf("API Key '%s' deleted successfully\n", apiKeyId)
+	fmt.Printf("API Key '%s' deleted successfully\n", clientId)
 
 	return nil
 }

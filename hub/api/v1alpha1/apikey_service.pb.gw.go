@@ -66,13 +66,13 @@ func request_ApiKeyService_DeleteAPIKey_0(ctx context.Context, marshaler runtime
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["id"]
+	val, ok := pathParams["client_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "client_id")
 	}
-	protoReq.Id, err = runtime.String(val)
+	protoReq.ClientId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "client_id", err)
 	}
 	msg, err := client.DeleteAPIKey(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -84,13 +84,13 @@ func local_request_ApiKeyService_DeleteAPIKey_0(ctx context.Context, marshaler r
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["id"]
+	val, ok := pathParams["client_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "client_id")
 	}
-	protoReq.Id, err = runtime.String(val)
+	protoReq.ClientId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "client_id", err)
 	}
 	msg, err := server.DeleteAPIKey(ctx, &protoReq)
 	return msg, metadata, err
@@ -146,7 +146,7 @@ func RegisterApiKeyServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/saas.v1alpha1.ApiKeyService/DeleteAPIKey", runtime.WithHTTPPathPattern("/v1alpha1/agents/apikey/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/saas.v1alpha1.ApiKeyService/DeleteAPIKey", runtime.WithHTTPPathPattern("/v1alpha1/agents/apikey/{client_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -241,7 +241,7 @@ func RegisterApiKeyServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/saas.v1alpha1.ApiKeyService/DeleteAPIKey", runtime.WithHTTPPathPattern("/v1alpha1/agents/apikey/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/saas.v1alpha1.ApiKeyService/DeleteAPIKey", runtime.WithHTTPPathPattern("/v1alpha1/agents/apikey/{client_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -276,7 +276,7 @@ func RegisterApiKeyServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 
 var (
 	pattern_ApiKeyService_CreateAPIKey_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1alpha1", "agents", "apikey"}, ""))
-	pattern_ApiKeyService_DeleteAPIKey_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"v1alpha1", "agents", "apikey", "id"}, ""))
+	pattern_ApiKeyService_DeleteAPIKey_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"v1alpha1", "agents", "apikey", "client_id"}, ""))
 	pattern_ApiKeyService_ListApiKey_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1alpha1", "apikeys"}, ""))
 )
 

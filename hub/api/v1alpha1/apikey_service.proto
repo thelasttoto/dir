@@ -22,7 +22,7 @@ message CreateApiKeyResponse {
 }
 
 message DeleteApiKeyRequest {
-  string id = 1;
+  string client_id = 1;
 }
 
 message DeleteApiKeyResponse {}
@@ -43,7 +43,7 @@ service ApiKeyService {
   }
 
   rpc DeleteAPIKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse) {
-    option (google.api.http) = {delete: "/v1alpha1/agents/apikey/{id}"};
+    option (google.api.http) = {delete: "/v1alpha1/agents/apikey/{client_id}"};
   }
 
   rpc ListApiKey(ListApiKeyRequest) returns (ListApiKeyResponse) {
