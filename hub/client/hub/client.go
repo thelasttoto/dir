@@ -32,7 +32,7 @@ type Client interface {
 	// CreateAPIKey creates an API key for the specified role and returns the (clientId, secret) or an error.
 	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error)
 	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
-	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error)
+	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, clientId string) (*v1alpha1.DeleteApiKeyResponse, error)
 	// ListAPIKeys lists all API keys for a specific organization and returns the response or an error.
 	ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organizationId string) (*v1alpha1.ListApiKeyResponse, error)
 }
@@ -206,9 +206,9 @@ func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSess
 	return chunk, nil
 }
 
-func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, apikeyId string) (*v1alpha1.DeleteApiKeyResponse, error) {
+func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, clientId string) (*v1alpha1.DeleteApiKeyResponse, error) {
 	req := &v1alpha1.DeleteApiKeyRequest{
-		Id: apikeyId,
+		ClientId: clientId,
 	}
 
 	resp, err := c.ApiKeyServiceClient.DeleteAPIKey(ctx, req)

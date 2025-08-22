@@ -45,16 +45,3 @@ func OpenBrowserForLogin(currentSession *sessionstore.HubSession, webserverSessi
 
 	return browser.OpenURL(loginPageWithRedirect) //nolint:wrapcheck
 }
-
-/*
-func isIAMAuthConfig(currentSession *sessionstore.HubSession) bool {
-	if currentSession == nil || currentSession.AuthConfig == nil {
-		return false
-	}
-	if currentSession.AuthConfig.IdpFrontendAddress != "" && currentSession.AuthConfig.IdpBackendAddress != "" {
-		return true
-	}
-
-	return false
-}
-*/
