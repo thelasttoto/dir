@@ -28,6 +28,7 @@ func OpenBrowserForLogin(currentSession *sessionstore.HubSession, webserverSessi
 	params := url.Values{}
 	loginPageWithRedirect := ""
 	if isIAMAuthConfig(currentSession) {
+		params.Add("redirectUri", fmt.Sprintf("http://localhost:%d", config.LocalWebserverPort))
 		loginPageWithRedirect = fmt.Sprintf("%s/%s/%s?%s", currentSession.AuthConfig.IdpFrontendAddress, currentSession.AuthConfig.IdpProductID, loginPath, params.Encode())
 	} else {
 		nonce, _ := oktaUtils.GenerateNonce()
