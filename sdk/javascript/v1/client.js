@@ -67,6 +67,35 @@ class Client {
         });
     }
 
+    push_referrer(requests, metadata = null) {
+        return new Promise((resolve, reject) => {
+            const call = this.storeClient.pushReferrer();
+
+            let pushReferrerResponses = [];
+
+            call.on('data', (response) => {
+                pushReferrerResponses.push(response);
+            });
+
+            call.on('end', () => {
+                resolve(pushReferrerResponses);
+            });
+
+            call.on('error', (stream_error) => {
+                console.error('Stream error:', stream_error);
+
+                reject(stream_error);
+            });
+
+            // Send a requests and close the stream
+            requests.forEach(request => {
+                call.write(request, metadata);
+            });
+
+            call.end();
+        });
+    }
+
     pull(refs, metadata = null) {
         return new Promise((resolve, reject) => {
             const call = this.storeClient.pull();
@@ -90,6 +119,35 @@ class Client {
             // Send a requests and close the stream
             refs.forEach(ref => {
                 call.write(ref, metadata);
+            });
+
+            call.end();
+        });
+    }
+
+    pull_referrer(requests, metadata = null) {
+        return new Promise((resolve, reject) => {
+            const call = this.storeClient.pullReferrer();
+
+            let pullReferrerResponses = [];
+
+            call.on('data', (response) => {
+                pullReferrerResponses.push(response);
+            });
+
+            call.on('end', () => {
+                resolve(pullReferrerResponses);
+            });
+
+            call.on('error', (stream_error) => {
+                console.error('Stream error:', stream_error);
+
+                reject(stream_error);
+            });
+
+            // Send a requests and close the stream
+            requests.forEach(request => {
+                call.write(request, metadata);
             });
 
             call.end();

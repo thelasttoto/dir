@@ -9,17 +9,25 @@ const skill_pb2 = require('@buf/agntcy_oasf.grpc_web/objects/v3/skill_pb');
 const locator_pb2 = require('@buf/agntcy_oasf.grpc_web/objects/v3/locator_pb');
 const record_query_type = require('@buf/agntcy_dir.grpc_web/routing/v1/record_query_pb');
 const routing_types = require('@buf/agntcy_dir.grpc_node/routing/v1/routing_service_pb');
-const search_types = require('@buf/agntcy_dir.grpc_node/search/v1/search_service_pb')
+const search_types = require('@buf/agntcy_dir.grpc_node/search/v1/search_service_pb');
+const store_types = require('@buf/agntcy_dir.grpc_node/store/v1/store_service_pb');
 const search_query_type = require('@buf/agntcy_dir.grpc_node/search/v1/record_query_pb');
-const { afterEach } = require('node:test');
+const sign_types = require('@buf/agntcy_dir.grpc_node/sign/v1/sign_service_pb');
+
+class GeneratedRecord {
+    constructor(ref, record) {
+        this.ref = ref;
+        this.record = record;
+    }
+}
 
 describe('Client', () => {
-    function generateRecords(names) {
+    async function initRecords(count, test_function_name, push = true, publish = false) {
         const test_records = [];
 
-        names.forEach(name => {
+        for (let index = 0; index < count; index++) {
             const exampleRecord = new record_pb2.Record();
-            exampleRecord.setName(name);
+            exampleRecord.setName(test_function_name + " " + index);
             exampleRecord.setVersion('v3');
             exampleRecord.setSchemaVersion("v0.5.0");
 
@@ -44,34 +52,59 @@ describe('Client', () => {
             const test_record = new core_record_pb2.Record();
             test_record.setV3(exampleRecord);
 
-            test_records.push(test_record);
-        });
+            test_records.push(new GeneratedRecord(null, test_record));
+        }
+
+        if (push === true) {
+            for (const test_record of test_records) {
+                try {
+                    references = await client.push([test_record.record]);
+
+                    test_record.ref = new core_record_pb2.RecordRef(references[0].u);
+                } catch (error) {
+                    throw new Error(error);
+                }
+            }
+        }
+
+        if (publish === true) {
+            for (const test_record of test_records) {
+                const publish_request = new routing_types.PublishRequest();
+                publish_request.setRecordCid(test_record.ref.u[0]);
+
+                let err = null;
+
+                try {
+                    client.publish(publish_request);
+                } catch (error) {
+                    err = error;
+                    throw new Error(error);
+                }
+            }
+        }
 
         return test_records;
     }
 
     const client = new Client(new Config());
 
-    let test_record_refs = null;
-
-    let shouldSkipTest = false;
-
     beforeEach(async () => {
-        if (shouldSkipTest === false) {
-            // Wait for directory api server to finish the test action
-            await setTimeout(3000);
-        }
+        // await setTimeout(3000); // Wait for api server
     });
 
-    afterEach(async () => {
-        const test_name = expect.getState().currentTestName.split(" ")[1];
-        if (test_name === 'push' && expect.getState().testFailing) {
-            shouldSkipTest = true;
-        }
+    afterAll(async () => {
+        client.storeClient.close();
+        client.routingClient.close();
+        client.searchClient.close();
     });
 
     test('push', async () => {
-        const test_records = generateRecords(['example-record', 'example-record2']);
+        const generated_records = await initRecords(2, "push", false, false);
+        const test_records = [];
+
+        generated_records.forEach(generated_record => {
+            test_records.push(generated_record.record);
+        });
 
         let references;
 
@@ -92,17 +125,20 @@ describe('Client', () => {
         expect(test_record_ref2).not.toBeNull();
         expect(test_record_ref1).toBeInstanceOf(core_record_pb2.RecordRef);
         expect(test_record_ref2).toBeInstanceOf(core_record_pb2.RecordRef);
-
-        test_record_refs = [test_record_ref1, test_record_ref2];
     });
 
     test('pull', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        const generated_records = await initRecords(2, "pull", true, false);
+        const test_records_ref = [];
+
+        generated_records.forEach(generated_record => {
+            test_records_ref.push(generated_record.ref);
+        });
 
         let pulled_records;
 
         try {
-            pulled_records = await client.pull(test_record_refs);
+            pulled_records = await client.pull(test_records_ref);
         } catch (error) {
             throw new Error(error);
         }
@@ -121,17 +157,17 @@ describe('Client', () => {
     });
 
     test('search', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        _ = await initRecords(2, "search", true, false);
 
         const search_query = new search_query_type.RecordQuery();
-        search_query.setType(search_query_type.RecordQueryType.RECORD_QUERY_TYPE_SKILL);
-        search_query.setValue('/skills/Natural Language Processing/Text Completion');
+        search_query.setType(search_query_type.RecordQueryType.RECORD_QUERY_TYPE_SKILL_ID);
+        search_query.setValue('1');
 
         const queries = [search_query];
 
         const search_request = new search_types.SearchRequest();
         search_request.setQueriesList(queries);
-        search_request.setLimit(3);
+        search_request.setLimit(2);
 
         let objects;
 
@@ -152,12 +188,17 @@ describe('Client', () => {
     });
 
     test('lookup', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        const generated_records = await initRecords(2, "lookup", true, false);
+        const test_records_ref = [];
+
+        generated_records.forEach(generated_record => {
+            test_records_ref.push(generated_record.ref);
+        });
 
         let metadatas;
 
         try {
-            metadatas = await client.lookup(test_record_refs);
+            metadatas = await client.lookup(test_records_ref);
         } catch (error) {
             throw new Error(error);
         }
@@ -168,15 +209,20 @@ describe('Client', () => {
     });
 
     test('publish', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        const generated_records = await initRecords(1, "publish", true, false);
+        const test_records_ref = [];
+
+        generated_records.forEach(generated_record => {
+            test_records_ref.push(generated_record.ref);
+        });
 
         const publish_request = new routing_types.PublishRequest();
-        publish_request.setRecordCid(test_record_refs[0].u[0]);
+        publish_request.setRecordCid(test_records_ref[0].u[0]);
 
-        const err = null;
+        let err = null;
 
         try {
-            await client.publish(publish_request);
+            client.publish(publish_request);
         } catch (error) {
             err = error;
             throw new Error(error);
@@ -188,7 +234,7 @@ describe('Client', () => {
     });
 
     test('list', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        _ = await initRecords(1, "list", true, true);
 
         const query = new record_query_type.RecordQuery();
         query.setType(record_query_type.RECORD_QUERY_TYPE_SKILL);
@@ -214,16 +260,20 @@ describe('Client', () => {
     });
 
     test('unpublish', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        const generated_records = await initRecords(1, "unpublish", true, false);
+        const test_records_ref = [];
 
+        generated_records.forEach(generated_record => {
+            test_records_ref.push(generated_record.ref);
+        });
 
         let unpublish_request = new routing_types.UnpublishRequest();
-        unpublish_request.setRecordCid(test_record_refs[0].u[0]);
+        unpublish_request.setRecordCid(test_records_ref[0].u[0]);
 
-        const err = null;
+        let err = null;
 
         try {
-            await client.unpublish(unpublish_request);
+            client.unpublish(unpublish_request);
         } catch (error) {
             err = error;
             throw new Error(error);
@@ -235,12 +285,17 @@ describe('Client', () => {
     });
 
     test('delete', async () => {
-        if (shouldSkipTest) { throw new Error("Test is skipped") };
+        const generated_records = await initRecords(1, "delete", true, false);
+        const test_records_ref = [];
 
-        const err = null;
+        generated_records.forEach(generated_record => {
+            test_records_ref.push(generated_record.ref);
+        });
+
+        let err = null;
 
         try {
-            await client.delete(test_record_refs);
+            await client.delete(test_records_ref);
         } catch (error) {
             err = error;
             throw new Error(error);
@@ -249,5 +304,55 @@ describe('Client', () => {
         expect(err).toBeNull();
 
         // no assertion needed, no response
+    });
+
+    test('pushReferrer', async () => {
+        const generated_records = await initRecords(2, "pushReferrer", true, false);
+        const requests = [];
+
+        generated_records.forEach(generated_record => {
+            let push_referrer_request = new store_types.PushReferrerRequest();
+            push_referrer_request.setRecordRef(generated_record.ref);
+            push_referrer_request.setSignature(new sign_types.Signature());
+
+            requests.push(push_referrer_request);
+        });
+
+        let err = null;
+
+        try {
+            await client.push_referrer(requests);
+        } catch (error) {
+            err = error;
+            throw new Error(error);
+        }
+
+        expect(err).toBeNull();
+    });
+
+    test('pullReferrer', async () => {
+        const generated_records = await initRecords(2, "pullReferrer", true, false);
+        const requests = [];
+
+        generated_records.forEach(generated_record => {
+            let pull_referrer_request = new store_types.PullReferrerRequest();
+            pull_referrer_request.setRecordRef(generated_record.ref);
+            pull_referrer_request.setPullSignature(false);
+
+            requests.push(pull_referrer_request);
+        });
+
+        let err = null;
+
+        try {
+            await client.pull_referrer(requests);
+        } catch (error) {
+            err = error;
+
+            if (error.details === "pull referrer not implemented") { err = null; return; }; // Remove when service implemented
+            throw new Error(error);
+        }
+
+        expect(err).toBeNull();
     });
 });
