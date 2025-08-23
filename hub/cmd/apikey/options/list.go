@@ -11,7 +11,8 @@ import (
 type ApiKeyListOptions struct {
 	*options.HubOptions
 
-	OrganizationId string
+	OrganizationId   string
+	OrganizationName string
 }
 
 func NewApiKeyListOptions(hubOpts *options.HubOptions, cmd *cobra.Command) *ApiKeyListOptions {
@@ -21,6 +22,7 @@ func NewApiKeyListOptions(hubOpts *options.HubOptions, cmd *cobra.Command) *ApiK
 
 	opt.AddRegisterFn(func() error {
 		cmd.Flags().StringVarP(&opt.OrganizationId, "org-id", "o", "", "Organization ID")
+		cmd.Flags().StringVarP(&opt.OrganizationName, "org-name", "n", "", "Organization Name")
 
 		return nil
 	})

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/cmd/apikey/options"
@@ -21,16 +22,20 @@ import (
 // NewCommand creates the "list" command for the Agent apikey Hub CLI.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list --org-id <org_id>",
+		Use:   "list {--org-id <org_id> | --org-name <org_name>}",
 		Short: "list API keys for a specific organization",
-		Long: `list API keys for a specific organization.
+		Long: `list API keys for a specific organization, identified by its ID or name.
 
 Parameters:
-  --org-id <org_id>  Organization ID
+  --org-id    <org_id>    Organization ID
+  --org-name  <org_name>  Organization Name
 
 Example:
-  # List API keys for organization "MyOrg"
-  dirctl hub apikey list --org-id MyOrg`,
+  # List API keys for organization with ID 935a67e3-0276-4f61-b1ff-000fb163eedd
+  dirctl hub apikey list --org-id "935a67e3-0276-4f61-b1ff-000fb163eedd"
+  
+  # List API keys for organization MyOrg
+  dirctl hub apikey list --org-name "MyOrg"`,
 	}
 
 	opts := options.NewApiKeyListOptions(hubOpts, cmd)
@@ -43,8 +48,21 @@ Example:
 }
 
 func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptions) error {
-	if opts.OrganizationId == "" {
-		return errors.New("organization ID is required")
+	if opts.OrganizationId == "" && opts.OrganizationName == "" {
+		return errors.New("organization ID or name is required")
+	} else if opts.OrganizationId != "" && opts.OrganizationName != "" {
+		return errors.New("only one of organization ID or name should be provided")
+	}
+
+	var organization any
+	if opts.OrganizationId != "" {
+		organization = &v1alpha1.ListApiKeyRequest_OrganizationId{
+			OrganizationId: opts.OrganizationId,
+		}
+	} else if opts.OrganizationName != "" {
+		organization = &v1alpha1.ListApiKeyRequest_OrganizationName{
+			OrganizationName: opts.OrganizationName,
+		}
 	}
 
 	// Retrieve session from context
@@ -69,12 +87,12 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptio
 		return fmt.Errorf("failed to create hub client: %w", err)
 	}
 
-	resp, err := service.ListAPIKeys(cmd.Context(), hc, opts.OrganizationId, currentSession)
+	resp, err := service.ListAPIKeys(cmd.Context(), hc, organization, currentSession)
 	if err != nil {
 		return fmt.Errorf("failed to list API keys: %w", err)
 	}
 
-	fmt.Printf("API Keys for organization %s:\n", opts.OrganizationId)
+	fmt.Printf("API Keys for organization %s%s:\n", opts.OrganizationId, opts.OrganizationName)
 
 	if resp == nil || len(resp.Apikeys) == 0 {
 		fmt.Println("No API keys found.")

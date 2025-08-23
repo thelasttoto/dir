@@ -30,11 +30,11 @@ type Client interface {
 	// PullAgent downloads an agent from the hub and returns the agent data or an error.
 	PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequest) ([]byte, error)
 	// CreateAPIKey creates an API key for the specified role and returns the (clientId, secret) or an error.
-	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error)
+	CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organization any) (*v1alpha1.CreateApiKeyResponse, error)
 	// DeleteAPIKey deletes an API key from the hub and returns the response or an error.
 	DeleteAPIKey(ctx context.Context, session *sessionstore.HubSession, clientId string) (*v1alpha1.DeleteApiKeyResponse, error)
 	// ListAPIKeys lists all API keys for a specific organization and returns the response or an error.
-	ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organizationId string) (*v1alpha1.ListApiKeyResponse, error)
+	ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organization any) (*v1alpha1.ListApiKeyResponse, error)
 }
 
 // client implements the Client interface for the Agent Hub backend.
@@ -179,14 +179,24 @@ func (c *client) PullAgent(ctx context.Context, request *v1alpha1.PullRecordRequ
 	return buffer.Bytes(), nil
 }
 
-func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organizationId string, organizationName string) (*v1alpha1.CreateApiKeyResponse, error) {
+func (c *client) CreateAPIKey(ctx context.Context, session *sessionstore.HubSession, roleName string, organization any) (*v1alpha1.CreateApiKeyResponse, error) {
 	roleValue, ok := v1alpha1.Role_value[roleName]
 	if !ok {
 		return nil, fmt.Errorf("Unknown role: %w", roleValue)
 	}
 	req := &v1alpha1.CreateApiKeyRequest{
-		Role:             v1alpha1.Role(roleValue),
-		OrganizationName: organizationName,
+		Role: v1alpha1.Role(roleValue),
+	}
+
+	switch parsedOrg := organization.(type) {
+	case *v1alpha1.CreateApiKeyRequest_OrganizationName:
+		fmt.Printf("Creating API key for organization name: %v\n", parsedOrg)
+		req.Organization = parsedOrg
+	case *v1alpha1.CreateApiKeyRequest_OrganizationId:
+		fmt.Printf("Creating API key for organization id: %v\n", parsedOrg)
+		req.Organization = parsedOrg
+	default:
+		return nil, fmt.Errorf("unknown organisation type: %T", organization)
 	}
 
 	stream, err := c.ApiKeyServiceClient.CreateAPIKey(ctx, req)
@@ -222,9 +232,19 @@ func (c *client) DeleteAPIKey(ctx context.Context, session *sessionstore.HubSess
 	return resp, nil
 }
 
-func (c *client) ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organizationId string) (*v1alpha1.ListApiKeyResponse, error) {
-	req := &v1alpha1.ListApiKeyRequest{
-		OrganizationId: organizationId,
+func (c *client) ListAPIKeys(ctx context.Context, session *sessionstore.HubSession, organization any) (*v1alpha1.ListApiKeyResponse, error) {
+
+	req := &v1alpha1.ListApiKeyRequest{}
+
+	switch parsedOrg := organization.(type) {
+	case *v1alpha1.ListApiKeyRequest_OrganizationName:
+		fmt.Printf("Listing API keys for organization name: %v\n", parsedOrg)
+		req.Organization = parsedOrg
+	case *v1alpha1.ListApiKeyRequest_OrganizationId:
+		fmt.Printf("Listing API keys for organization id: %v\n", parsedOrg)
+		req.Organization = parsedOrg
+	default:
+		return nil, fmt.Errorf("unknown organisation type: %T", organization)
 	}
 
 	resp, err := c.ApiKeyServiceClient.ListApiKey(ctx, req)
