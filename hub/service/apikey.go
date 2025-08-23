@@ -19,13 +19,12 @@ func CreateAPIKey(
 	ctx context.Context,
 	hc hubClient.Client,
 	role string,
-	organizationId string,
-	organizationName string,
+	organization any,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.CreateApiKeyResponse, error) {
 	ctx = authUtils.AddAuthToContext(ctx, session)
 
-	resp, err := hc.CreateAPIKey(ctx, nil, role, organizationId, organizationName)
+	resp, err := hc.CreateAPIKey(ctx, nil, role, organization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key: %w", err)
 	}
@@ -56,12 +55,12 @@ func DeleteAPIKey(
 func ListAPIKeys(
 	ctx context.Context,
 	hc hubClient.Client,
-	organizationId string,
+	organization any,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.ListApiKeyResponse, error) {
 	ctx = authUtils.AddAuthToContext(ctx, session)
 
-	resp, err := hc.ListAPIKeys(ctx, nil, organizationId)
+	resp, err := hc.ListAPIKeys(ctx, nil, organization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}

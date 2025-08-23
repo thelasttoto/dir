@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/cmd/apikey/options"
@@ -22,17 +23,21 @@ import (
 // NewCommand creates the "create" command for the Agent apikey Hub CLI.
 func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create --role <role> --org-name <org_name>",
+		Use:   "create --role <role> {--org-id <org_id> | --org-name <org_name>}",
 		Short: "create a new API key for hub actions in an organization, with specified role",
 		Long: `create a new API key for hub actions in an organization, with specified role.
 
 Parameters:
-  --role <role>          Role name. One of ['ROLE_ORG_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR', 'ROLE_VIEWER']
-  --org-name <org_name>  Organization Name
+  --role      <role>      Role name. One of ['ROLE_ORG_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR', 'ROLE_VIEWER']
+  --org-id    <org_id>    Organization ID
+  --org-name  <org_name>  Organization Name
 
 Example:
   # Create a new API key with role OrgAdmin for organization "MyOrg"
-  dirctl hub apikey create --role ROLE_ORG_ADMIN --org-name MyOrg`,
+  dirctl hub apikey create --role ROLE_ORG_ADMIN --org-name MyOrg
+
+  # Create a new API key with role OrgAdmin for organization with ID 935a67e3-0276-4f61-b1ff-000fb163eedd
+  dirctl hub apikey create --role ROLE_ORG_ADMIN --org-id "935a67e3-0276-4f61-b1ff-000fb163eedd"`,
 	}
 
 	opts := options.NewApiKeyCreateOptions(hubOpts, cmd)
@@ -47,15 +52,19 @@ Example:
 func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOptions) error {
 	if opts.OrganizationId == "" && opts.OrganizationName == "" {
 		return errors.New("organization ID or name is required")
+	} else if opts.OrganizationId != "" && opts.OrganizationName != "" {
+		return errors.New("only one of organization ID or name should be provided")
 	}
+
+	var organization any
 	if opts.OrganizationId != "" {
-		fmt.Printf("Creating new API key with role: '%s' for org ID: '%s'...\n", opts.Role, opts.OrganizationId)
-		if opts.OrganizationName != "" {
-			// Org Id & name are both set, use ID preferentially.
-			opts.OrganizationName = ""
+		organization = &v1alpha1.CreateApiKeyRequest_OrganizationId{
+			OrganizationId: opts.OrganizationId,
 		}
-	} else {
-		fmt.Printf("Creating new API key with role: '%s' for org name: '%s'\n", opts.Role, opts.OrganizationName)
+	} else if opts.OrganizationName != "" {
+		organization = &v1alpha1.CreateApiKeyRequest_OrganizationName{
+			OrganizationName: opts.OrganizationName,
+		}
 	}
 
 	// Retrieve session from context
@@ -80,7 +89,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyCreateOpt
 		return fmt.Errorf("failed to create hub client: %w", err)
 	}
 
-	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, opts.OrganizationId, opts.OrganizationName, currentSession)
+	resp, err := service.CreateAPIKey(cmd.Context(), hc, opts.Role, organization, currentSession)
 	if err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
 	}
