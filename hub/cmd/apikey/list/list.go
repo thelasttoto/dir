@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
 	"github.com/agntcy/dir/hub/auth"
@@ -38,7 +37,7 @@ Example:
   dirctl hub apikey list --org-name "MyOrg"`,
 	}
 
-	opts := options.NewApiKeyListOptions(hubOpts, cmd)
+	opts := options.NewAPIKeyListOptions(hubOpts, cmd)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return runCommand(cmd, args, opts)
@@ -47,17 +46,17 @@ Example:
 	return cmd
 }
 
-func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptions) error {
-	if opts.OrganizationId == "" && opts.OrganizationName == "" {
+func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyListOptions) error { //nolint:cyclop
+	if opts.OrganizationID == "" && opts.OrganizationName == "" {
 		return errors.New("organization ID or name is required")
-	} else if opts.OrganizationId != "" && opts.OrganizationName != "" {
+	} else if opts.OrganizationID != "" && opts.OrganizationName != "" {
 		return errors.New("only one of organization ID or name should be provided")
 	}
 
 	var organization any
-	if opts.OrganizationId != "" {
+	if opts.OrganizationID != "" {
 		organization = &v1alpha1.ListApiKeyRequest_OrganizationId{
-			OrganizationId: opts.OrganizationId,
+			OrganizationId: opts.OrganizationID,
 		}
 	} else if opts.OrganizationName != "" {
 		organization = &v1alpha1.ListApiKeyRequest_OrganizationName{
@@ -67,18 +66,21 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptio
 
 	// Retrieve session from context
 	ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
+
 	currentSession, ok := ctxSession.(*sessionstore.HubSession)
 	if !ok || currentSession == nil {
 		return errors.New("could not get current hub session")
 	}
-	if !auth.HasLoginCreds(currentSession) && auth.HasApiKey(currentSession) {
-		fmt.Println("User is authenticated with API key, using it to get credentials...")
-		if err := auth.RefreshApiKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
+
+	if !auth.HasLoginCreds(currentSession) && auth.HasAPIKey(currentSession) {
+		fmt.Fprintf(cmd.OutOrStdout(), "User is authenticated with API key, using it to get credentials...")
+
+		if err := auth.RefreshAPIKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
 			return fmt.Errorf("failed to refresh API key access token: %w", err)
 		}
 	}
 
-	if !auth.HasLoginCreds(currentSession) && !auth.HasApiKey(currentSession) {
+	if !auth.HasLoginCreds(currentSession) && !auth.HasAPIKey(currentSession) {
 		return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
 	}
 
@@ -92,18 +94,20 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.ApiKeyListOptio
 		return fmt.Errorf("failed to list API keys: %w", err)
 	}
 
-	fmt.Printf("API Keys for organization %s%s:\n", opts.OrganizationId, opts.OrganizationName)
+	fmt.Fprintf(cmd.OutOrStdout(), "API Keys for organization %v:\n", organization)
 
-	if resp == nil || len(resp.Apikeys) == 0 {
-		fmt.Println("No API keys found.")
+	if resp == nil || len(resp.GetApikeys()) == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "No API keys found.")
+
 		return nil
 	}
 
-	prettyModel, err := json.MarshalIndent(resp.Apikeys, "", "  ")
+	prettyModel, err := json.MarshalIndent(resp.GetApikeys(), "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal agent: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "%s\n", string(prettyModel))
+
+	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(prettyModel))
 
 	return nil
 }

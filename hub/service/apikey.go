@@ -24,7 +24,7 @@ func CreateAPIKey(
 ) (*v1alpha1.CreateApiKeyResponse, error) {
 	ctx = authUtils.AddAuthToContext(ctx, session)
 
-	resp, err := hc.CreateAPIKey(ctx, nil, role, organization)
+	resp, err := hc.CreateAPIKey(ctx, role, organization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key: %w", err)
 	}
@@ -37,12 +37,12 @@ func CreateAPIKey(
 func DeleteAPIKey(
 	ctx context.Context,
 	hc hubClient.Client,
-	apikeyId string,
+	apikeyID string,
 	session *sessionstore.HubSession,
 ) (*v1alpha1.DeleteApiKeyResponse, error) {
 	ctx = authUtils.AddAuthToContext(ctx, session)
 
-	resp, err := hc.DeleteAPIKey(ctx, nil, apikeyId)
+	resp, err := hc.DeleteAPIKey(ctx, apikeyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete API key: %w", err)
 	}
@@ -60,7 +60,7 @@ func ListAPIKeys(
 ) (*v1alpha1.ListApiKeyResponse, error) {
 	ctx = authUtils.AddAuthToContext(ctx, session)
 
-	resp, err := hc.ListAPIKeys(ctx, nil, organization)
+	resp, err := hc.ListAPIKeys(ctx, organization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}

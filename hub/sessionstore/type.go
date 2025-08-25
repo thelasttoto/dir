@@ -19,8 +19,8 @@ type HubSessions struct {
 type HubSession struct {
 	Tokens            *Tokens `json:"tokens"`
 	User              string  `json:"user"`
-	ApiKeyAccess      *ApiKey `json:"api_key_access,omitempty"`
-	ApiKeyAccessToken *Tokens `json:"access_token"`
+	APIKeyAccess      *APIKey `json:"api_key_access,omitempty"`
+	APIKeyAccessToken *Tokens `json:"access_token"`
 	*AuthConfig       `json:"auth_config,omitempty"`
 }
 
@@ -41,7 +41,7 @@ type AuthConfig struct {
 	HubBackendAddress  string `json:"hub_backend"`
 }
 
-type ApiKey struct {
+type APIKey struct {
 	ClientID string `json:"client_id"`
 	Secret   string `json:"secret"`
 }

@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/agntcy/dir/hub/auth/utils"
@@ -14,29 +15,30 @@ import (
 	httpUtils "github.com/agntcy/dir/hub/utils/http"
 )
 
-func RefreshApiKeyAccessToken(ctx context.Context, session *sessionstore.HubSession, sessionKey string) error {
+func RefreshAPIKeyAccessToken(ctx context.Context, session *sessionstore.HubSession, sessionKey string) error {
 	// If the session has an API key access token, we can refresh it.
-	if session == nil || !HasApiKey(session) {
-		return fmt.Errorf("no API key access token available in the session")
+	if session == nil || !HasAPIKey(session) {
+		return errors.New("no API key access token available in the session")
 	}
 
 	idpClient := idp.NewClient(session.AuthConfig.IdpIssuerAddress, httpUtils.CreateSecureHTTPClient())
 
-	var idpResp *idp.GetAccessTokenResponse
 	var err error
+
+	var idpResp *idp.GetAccessTokenResponse
 	if utils.IsIAMAuthConfig(session) {
-		idpResp, err = idpClient.GetAccessTokenFromApiKey(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
+		idpResp, err = idpClient.GetAccessTokenFromAPIKey(ctx, session.APIKeyAccess.ClientID, session.APIKeyAccess.Secret)
 		if err != nil {
 			return fmt.Errorf("failed to refresh API key access token: %w", err)
 		}
 	} else {
-		idpResp, err = idpClient.GetAccessTokenFromOkta(ctx, session.ApiKeyAccess.ClientID, session.ApiKeyAccess.Secret)
+		idpResp, err = idpClient.GetAccessTokenFromOkta(ctx, session.APIKeyAccess.ClientID, session.APIKeyAccess.Secret)
 		if err != nil {
 			return fmt.Errorf("failed to refresh API key access token: %w", err)
 		}
 	}
 
-	session.ApiKeyAccessToken = &sessionstore.Tokens{
+	session.APIKeyAccessToken = &sessionstore.Tokens{
 		AccessToken:  idpResp.AccessToken,
 		RefreshToken: idpResp.RefreshToken,
 		IDToken:      idpResp.IDToken,

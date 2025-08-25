@@ -7,12 +7,12 @@ import (
 	"github.com/agntcy/dir/hub/cmd/options"
 )
 
-type ApiKeyDeleteOptions struct {
+type APIKeyDeleteOptions struct {
 	*options.HubOptions
 }
 
-func NewApiKeyDeleteOptions(hubOptions *options.HubOptions) *ApiKeyDeleteOptions {
-	return &ApiKeyDeleteOptions{
+func NewAPIKeyDeleteOptions(hubOptions *options.HubOptions) *APIKeyDeleteOptions {
+	return &APIKeyDeleteOptions{
 		HubOptions: hubOptions,
 	}
 }

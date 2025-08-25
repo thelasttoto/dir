@@ -88,15 +88,18 @@ func ParseRepoTagID(id string) any {
 // ParseOrganisationName parses an organization name string from a Repository.
 // Returns an OrganizationName.
 func ParseOrganisationName(repository string) (string, error) {
+	const orgPartsNumber = 2
+
 	parts := strings.Split(repository, "/")
-	if len(parts) == 2 {
+	if len(parts) == orgPartsNumber {
 		return parts[0], nil
 	}
+
 	return "", fmt.Errorf("invalid repository format: %s. Expected format is '<org>/<repo>'", repository)
 }
 
 // PushAgent pushes an agent to the hub and returns the response.
-// It uses the provided session for authentication.Ò
+// It uses the provided session for authentication.
 func PushAgent(
 	ctx context.Context,
 	hc hubClient.Client,

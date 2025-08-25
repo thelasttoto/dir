@@ -28,7 +28,7 @@ const (
 	gapSize    = 4
 )
 
-// isOrganizationNameValid validates organization name against the API format and rejects UUID format
+// isOrganizationNameValid validates organization name against the API format and rejects UUID format.
 func isOrganizationNameValid(name string) bool {
 	if name == "" {
 		return true
@@ -58,7 +58,7 @@ func NewCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 }
 
 // newListCommand creates the "orgs list" subcommand.
-func newListCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
+func newListCommand(_ *hubOptions.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -86,7 +86,7 @@ func newListCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 			return fmt.Errorf("failed to get orgs list: %w", err)
 		}
 
-		renderList(cmd.OutOrStdout(), orgs.Organizations)
+		renderList(cmd.OutOrStdout(), orgs.GetOrganizations())
 
 		return nil
 	}
@@ -95,7 +95,7 @@ func newListCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
 }
 
 // newCreateCommand creates the "orgs create" subcommand.
-func newCreateCommand(hubOpts *hubOptions.HubOptions) *cobra.Command {
+func newCreateCommand(_ *hubOptions.HubOptions) *cobra.Command {
 	var (
 		orgName        string
 		orgDescription string
@@ -121,7 +121,12 @@ Examples:
 
 	cmd.Flags().StringVarP(&orgName, "name", "n", "", "Organization name (required)")
 	cmd.Flags().StringVarP(&orgDescription, "description", "d", "", "Organization description (optional)")
-	cmd.MarkFlagRequired("name")
+
+	if err := cmd.MarkFlagRequired("name"); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "failed to mark name flag as required: %s", err.Error())
+
+		return nil
+	}
 
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
@@ -155,9 +160,9 @@ Examples:
 		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "Organization created successfully:\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "ID:          %s\n", org.Id)
-		fmt.Fprintf(cmd.OutOrStdout(), "Name:        %s\n", org.Name)
-		fmt.Fprintf(cmd.OutOrStdout(), "Description: %s\n", org.Description)
+		fmt.Fprintf(cmd.OutOrStdout(), "ID:          %s\n", org.GetId())
+		fmt.Fprintf(cmd.OutOrStdout(), "Name:        %s\n", org.GetName())
+		fmt.Fprintf(cmd.OutOrStdout(), "Description: %s\n", org.GetDescription())
 
 		return nil
 	}
@@ -175,23 +180,22 @@ func renderList(stream io.Writer, organizationsWithRoles []*saasv1alpha1.Organiz
 	longestIDLen := len(idHeader)
 
 	for i, org := range organizationsWithRoles {
-		if len(org.Organization.Name) > longestNameLen {
-			longestNameLen = len(org.Organization.Name)
+		if len(org.GetOrganization().GetName()) > longestNameLen {
+			longestNameLen = len(org.GetOrganization().GetName())
 		}
 
-		if len(org.Organization.Id) > longestIDLen {
-			longestIDLen = len(org.Organization.Id)
+		if len(org.GetOrganization().GetId()) > longestIDLen {
+			longestIDLen = len(org.GetOrganization().GetId())
 		}
 
-		if len(org.Role.String()) > longestRoleLen {
-			longestRoleLen = len(org.Role.String())
+		if len(org.GetRole().String()) > longestRoleLen {
+			longestRoleLen = len(org.GetRole().String())
 		}
 
 		renderFns[i] = func(lName, lId, lRole int) string {
-
-			nameCol := text.AlignLeft.Apply(org.Organization.Name, lName+gapSize)
-			idCol := text.AlignLeft.Apply(org.Organization.Id, lId+gapSize)
-			roleCol := text.AlignLeft.Apply(org.Role.String(), lRole)
+			nameCol := text.AlignLeft.Apply(org.GetOrganization().GetName(), lName+gapSize)
+			idCol := text.AlignLeft.Apply(org.GetOrganization().GetId(), lId+gapSize)
+			roleCol := text.AlignLeft.Apply(org.GetRole().String(), lRole)
 
 			return fmt.Sprintf("%s%s%s", nameCol, idCol, roleCol)
 		}

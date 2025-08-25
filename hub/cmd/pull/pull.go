@@ -7,7 +7,6 @@ package pull
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
@@ -48,20 +47,21 @@ Examples:
 
 		// Retrieve session from context
 		ctxSession := cmd.Context().Value(sessionstore.SessionContextKey)
+
 		currentSession, ok := ctxSession.(*sessionstore.HubSession)
 		if !ok || currentSession == nil {
-			errors.New("could not get current hub session")
+			return errors.New("could not get current hub session")
 		}
 
-		if !auth.HasLoginCreds(currentSession) && auth.HasApiKey(currentSession) {
-			fmt.Println("User is authenticated with API key, using it to get credentials...")
+		if !auth.HasLoginCreds(currentSession) && auth.HasAPIKey(currentSession) {
+			fmt.Fprintf(cmd.OutOrStdout(), "User is authenticated with API key, using it to get credentials...")
 
-			if err := auth.RefreshApiKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
+			if err := auth.RefreshAPIKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
 				return fmt.Errorf("failed to refresh API key access token: %w", err)
 			}
 		}
 
-		if !auth.HasLoginCreds(currentSession) && !auth.HasApiKey(currentSession) {
+		if !auth.HasLoginCreds(currentSession) && !auth.HasAPIKey(currentSession) {
 			return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
 		}
 
@@ -79,7 +79,8 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to pull agent: %w", err)
 		}
-		fmt.Fprintf(os.Stdout, "%s\n", string(prettyModel))
+
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(prettyModel))
 
 		return nil
 	}

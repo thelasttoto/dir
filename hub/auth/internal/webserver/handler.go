@@ -79,6 +79,7 @@ func (h *Handler) HandleHealthz(w http.ResponseWriter, _ *http.Request) {
 // HandleRequestRedirect handles the initial OAuth redirect, generating a PKCE challenge and redirecting to the IdP.
 func (h *Handler) HandleRequestRedirect(w http.ResponseWriter, r *http.Request) {
 	requestID := r.URL.Query().Get("request")
+
 	var challenge string
 	h.sessionStore.Verifier, challenge = utils.GenerateChallenge()
 
@@ -107,7 +108,7 @@ func (h *Handler) HandleCodeRedirect(w http.ResponseWriter, r *http.Request) {
 		Verifier:    h.sessionStore.Verifier,
 		Code:        code,
 	})
-	if err != nil {
+	if err != nil { //nolint:wsl
 		h.handleError(w, err)
 
 		return

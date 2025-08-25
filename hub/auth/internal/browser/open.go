@@ -4,6 +4,7 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -23,11 +24,13 @@ const (
 // OpenBrowserForLogin opens the default web browser to the login page for the given AuthConfig.
 func OpenBrowserForLogin(currentSession *sessionstore.HubSession, webserverSession *webserver.SessionStore, oktaClient okta.Client) error {
 	if currentSession.AuthConfig == nil {
-		return fmt.Errorf("authConfig is nil")
+		return errors.New("authConfig is nil")
 	}
 
 	params := url.Values{}
-	loginPageWithRedirect := ""
+
+	var loginPageWithRedirect string
+
 	if authUtils.IsIAMAuthConfig(currentSession) {
 		params.Add("redirectUri", fmt.Sprintf("http://localhost:%d", config.LocalWebserverPort))
 		loginPageWithRedirect = fmt.Sprintf("%s/%s/%s?%s", currentSession.AuthConfig.IdpFrontendAddress, currentSession.AuthConfig.IdpProductID, loginPath, params.Encode())

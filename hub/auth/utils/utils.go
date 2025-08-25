@@ -1,8 +1,12 @@
+// Copyright AGNTCY Contributors (https://github.com/agntcy)
+// SPDX-License-Identifier: Apache-2.0
+
 package utils
 
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/agntcy/dir/hub/sessionstore"
 	"google.golang.org/grpc/metadata"
@@ -17,9 +21,10 @@ func AddAuthToContext(ctx context.Context, session *sessionstore.HubSession) con
 		}
 	}
 	// Otherwise, using API key access token if present
-	if session != nil && session.ApiKeyAccessToken != nil && session.ApiKeyAccessToken.AccessToken != "" {
-		fmt.Println("Using API key access token")
-		return metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", "Bearer "+session.ApiKeyAccessToken.AccessToken))
+	if session != nil && session.APIKeyAccessToken != nil && session.APIKeyAccessToken.AccessToken != "" {
+		fmt.Fprintf(os.Stdout, "Using API key access token\n")
+
+		return metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", "Bearer "+session.APIKeyAccessToken.AccessToken))
 	}
 
 	return ctx
@@ -29,6 +34,7 @@ func IsIAMAuthConfig(currentSession *sessionstore.HubSession) bool {
 	if currentSession == nil || currentSession.AuthConfig == nil {
 		return false
 	}
+
 	if currentSession.AuthConfig.IdpFrontendAddress != "" && currentSession.AuthConfig.IdpBackendAddress != "" {
 		return true
 	}

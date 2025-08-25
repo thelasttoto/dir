@@ -50,18 +50,18 @@ Examples:
 
 		currentSession, ok := ctxSession.(*sessionstore.HubSession)
 		if !ok || currentSession == nil {
-			errors.New("could not get current hub session")
+			return errors.New("could not get current hub session")
 		}
 
-		if !auth.HasLoginCreds(currentSession) && auth.HasApiKey(currentSession) {
-			fmt.Println("User is authenticated with API key, using it to get credentials...")
+		if !auth.HasLoginCreds(currentSession) && auth.HasAPIKey(currentSession) {
+			fmt.Fprintln(cmd.OutOrStdout(), "User is authenticated with API key, using it to get credentials...")
 
-			if err := auth.RefreshApiKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
+			if err := auth.RefreshAPIKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
 				return fmt.Errorf("failed to refresh API key access token: %w", err)
 			}
 		}
 
-		if !auth.HasLoginCreds(currentSession) && !auth.HasApiKey(currentSession) {
+		if !auth.HasLoginCreds(currentSession) && !auth.HasAPIKey(currentSession) {
 			return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
 		}
 
