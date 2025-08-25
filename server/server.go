@@ -26,7 +26,6 @@ import (
 	"github.com/agntcy/dir/server/types"
 	"github.com/agntcy/dir/utils/logging"
 	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
@@ -130,16 +129,11 @@ func New(ctx context.Context, cfg *config.Config) (*Server, error) {
 			return nil, fmt.Errorf("failed to fetch trust bundle: %w", err)
 		}
 
-		trustDomain, err := spiffeid.TrustDomainFromString(cfg.Authz.TrustDomain)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse trust domain: %w", err)
-		}
-
 		// Add server options for SPIFFE mTLS
 		//nolint:contextcheck
 		serverOpts = append(serverOpts,
 			grpc.Creds(
-				grpccredentials.MTLSServerCredentials(x509Src, bundleSrc, tlsconfig.AuthorizeMemberOf(trustDomain)),
+				grpccredentials.MTLSServerCredentials(x509Src, bundleSrc, tlsconfig.AuthorizeAny()),
 			),
 			grpc.ChainUnaryInterceptor(unaryInterceptorFor(authInterceptor)),
 			grpc.ChainStreamInterceptor(streamInterceptorFor(authInterceptor)),
@@ -240,7 +234,7 @@ func authInterceptor(ctx context.Context) error {
 		return status.Error(codes.Unauthenticated, "missing peer ID") //nolint:wrapcheck
 	}
 
-	logger.Debug("Authenticated peer", "peer_id", sid)
+	logger.Debug("Authenticated user", "id", sid)
 
 	return nil
 }

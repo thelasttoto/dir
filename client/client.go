@@ -12,7 +12,6 @@ import (
 	signv1 "github.com/agntcy/dir/api/sign/v1"
 	storev1 "github.com/agntcy/dir/api/store/v1"
 	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
@@ -87,14 +86,9 @@ func New(opts ...Option) (*Client, error) {
 			return nil, fmt.Errorf("failed to fetch trust bundle: %w", err)
 		}
 
-		trustDomain, err := spiffeid.TrustDomainFromString(options.config.SpiffeTrustDomain)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse trust domain: %w", err)
-		}
-
 		// Add client options for SPIFFE mTLS
 		clientOpts = append(clientOpts, grpc.WithTransportCredentials(
-			grpccredentials.MTLSClientCredentials(x509Src, bundleSrc, tlsconfig.AuthorizeMemberOf(trustDomain)),
+			grpccredentials.MTLSClientCredentials(x509Src, bundleSrc, tlsconfig.AuthorizeAny()),
 		))
 	} else {
 		clientOpts = append(clientOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
