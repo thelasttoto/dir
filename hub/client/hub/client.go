@@ -7,6 +7,7 @@ package hub
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +19,7 @@ import (
 	"github.com/agntcy/dir/hub/sessionstore"
 	"github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 const chunkSize = 4096 // 4KB
@@ -51,8 +52,7 @@ func New(serverAddr string) (*client, error) { //nolint:revive
 	// Create connection
 	conn, err := grpc.NewClient(
 		serverAddr,
-		//grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create grpc client: %w", err)
