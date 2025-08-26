@@ -36,14 +36,6 @@ type Client interface {
 	DeleteAPIKey(ctx context.Context, clientID string) (*v1alpha1.DeleteApiKeyResponse, error)
 	// ListAPIKeys lists all API keys for a specific organization and returns the response or an error.
 	ListAPIKeys(ctx context.Context, organization any) (*v1alpha1.ListApiKeyResponse, error)
-	// ListOrganizations lists all organizations for the authenticated user and returns the response or an error.
-	ListOrganizations(ctx context.Context, request *v1alpha1.ListOrganizationsRequest) (*v1alpha1.ListOrganizationsResponse, error)
-	// CreateOrganization creates a new organization and returns the response or an error.
-	CreateOrganization(ctx context.Context, request *v1alpha1.CreateOrganizationRequest) (*v1alpha1.Organization, error)
-	// GetOrganization gets a specific organization by ID and returns the response or an error.
-	GetOrganization(ctx context.Context, request *v1alpha1.GetOrganizationRequest) (*v1alpha1.OrganizationWithRole, error)
-	// GetUser gets the current user information and returns the response or an error.
-	GetUser(ctx context.Context, request *v1alpha1.GetUserRequest) (*v1alpha1.User, error)
 }
 
 // client implements the Client interface for the Agent Hub backend.
@@ -255,58 +247,6 @@ func (c *client) ListAPIKeys(ctx context.Context, organization any) (*v1alpha1.L
 
 	if resp == nil {
 		return nil, errors.New("received nil response from list api keys")
-	}
-
-	return resp, nil
-}
-
-func (c *client) ListOrganizations(ctx context.Context, request *v1alpha1.ListOrganizationsRequest) (*v1alpha1.ListOrganizationsResponse, error) {
-	resp, err := c.OrganizationServiceClient.ListOrganizations(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list organizations: %w", err)
-	}
-
-	if resp == nil {
-		return nil, errors.New("received nil response from list organizations")
-	}
-
-	return resp, nil
-}
-
-func (c *client) CreateOrganization(ctx context.Context, request *v1alpha1.CreateOrganizationRequest) (*v1alpha1.Organization, error) {
-	resp, err := c.OrganizationServiceClient.CreateOrganization(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create organization: %w", err)
-	}
-
-	if resp == nil {
-		return nil, errors.New("received nil response from create organization")
-	}
-
-	return resp, nil
-}
-
-func (c *client) GetOrganization(ctx context.Context, request *v1alpha1.GetOrganizationRequest) (*v1alpha1.OrganizationWithRole, error) {
-	resp, err := c.OrganizationServiceClient.GetOrganization(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get organization: %w", err)
-	}
-
-	if resp == nil {
-		return nil, errors.New("received nil response from get organization")
-	}
-
-	return resp, nil
-}
-
-func (c *client) GetUser(ctx context.Context, request *v1alpha1.GetUserRequest) (*v1alpha1.User, error) {
-	resp, err := c.UserServiceClient.GetUser(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	if resp == nil {
-		return nil, errors.New("received nil response from get user")
 	}
 
 	return resp, nil
