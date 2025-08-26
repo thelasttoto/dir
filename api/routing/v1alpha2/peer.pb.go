@@ -263,4 +263,3 @@ func file_routing_v1alpha2_peer_proto_init() {
 	file_routing_v1alpha2_peer_proto_goTypes = nil
 	file_routing_v1alpha2_peer_proto_depIdxs = nil
 }
-
