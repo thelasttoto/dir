@@ -63,7 +63,6 @@ func NewCommand(_ *hubOptions.HubOptions) *cobra.Command {
 
 // renderUser renders user information in a formatted table-like output.
 func renderUser(stream io.Writer, user *saasv1alpha1.User) {
-	fmt.Fprintf(stream, "User Information:\n")
 	fmt.Fprintf(stream, "  ID:         %s\n", user.GetId())
 	fmt.Fprintf(stream, "  Username:   %s\n", user.GetUsername())
 
