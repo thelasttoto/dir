@@ -35,12 +35,14 @@ Examples:
   dirctl hub info org 12345678-1234-1234-1234-123456789abc
   dirctl hub info org my-org-id`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
+			if len(args) == 0 {
 				cmd.SetOut(os.Stdout)
 				cmd.SetErr(os.Stderr)
-				cmd.Help()
-				os.Exit(0)
+				_ = cmd.Help()
+
+				return nil
 			}
+
 			return nil
 		},
 	}
@@ -79,7 +81,7 @@ Examples:
 	return cmd
 }
 
-// renderOrganization renders organization information in a formatted table-like output
+// renderOrganization renders organization information in a formatted table-like output.
 func renderOrganization(stream io.Writer, orgWithRole *saasv1alpha1.OrganizationWithRole) {
 	org := orgWithRole.GetOrganization()
 
