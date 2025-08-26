@@ -32,8 +32,7 @@ func NewCommand(_ *hubOptions.HubOptions) *cobra.Command {
 This command retrieves and displays the organization details in JSON format.
 
 Examples:
-  dirctl hub info org 12345678-1234-1234-1234-123456789abc
-  dirctl hub info org my-org-id`,
+  dirctl hub info org 12345678-1234-1234-1234-123456789abc`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				cmd.SetOut(os.Stdout)
@@ -85,7 +84,6 @@ Examples:
 func renderOrganization(stream io.Writer, orgWithRole *saasv1alpha1.OrganizationWithRole) {
 	org := orgWithRole.GetOrganization()
 
-	fmt.Fprintf(stream, "Organization Information:\n")
 	fmt.Fprintf(stream, "  ID:          %s\n", org.GetId())
 	fmt.Fprintf(stream, "  Name:        %s\n", org.GetName())
 
