@@ -5,13 +5,16 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	corev1 "github.com/agntcy/dir/api/core/v1"
 	routingv1 "github.com/agntcy/dir/api/routing/v1"
+	"github.com/agntcy/dir/server/routing/validators"
 	"github.com/agntcy/dir/server/types"
 	"github.com/agntcy/dir/server/types/adapters"
 	"github.com/agntcy/dir/utils/logging"
@@ -36,7 +39,7 @@ func newLocal(store types.StoreAPI, dstore types.Datastore) *routeLocal {
 	}
 }
 
-func (r *routeLocal) Publish(ctx context.Context, ref *corev1.RecordRef, record *corev1.Record) error {
+func (r *routeLocal) Publish(ctx context.Context, ref *corev1.RecordRef, record *corev1.Record, localPeerID string) error {
 	localLogger.Debug("Called local routing's Publish method", "ref", ref, "record", record)
 
 	// Validate input parameters
@@ -79,12 +82,28 @@ func (r *routeLocal) Publish(ctx context.Context, ref *corev1.RecordRef, record 
 		return status.Errorf(codes.Internal, "failed to put record key: %v", err)
 	}
 
-	// keep track of all record skills
+	// Update metrics for all record labels and store them locally for queries
+	// Note: This handles ALL local storage for both local-only and network scenarios
+	// Network announcements are handled separately by routing_remote when peers are available
 	labels := getLabels(record)
 	for _, label := range labels {
-		// Add key with cid
-		labelKey := fmt.Sprintf("%s/%s", label, ref.GetCid())
-		if err := batch.Put(ctx, datastore.NewKey(labelKey), nil); err != nil {
+		// Create metadata for local label
+		metadata := &LabelMetadata{
+			Timestamp: time.Now(),
+			PeerID:    localPeerID,
+			CID:       ref.GetCid(),
+			LastSeen:  time.Now(),
+		}
+
+		// Serialize metadata to JSON
+		metadataBytes, err := json.Marshal(metadata)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to serialize label metadata: %v", err)
+		}
+
+		// Store label key with metadata for local List queries
+		labelKey := datastore.NewKey(fmt.Sprintf("%s/%s", label, ref.GetCid()))
+		if err := batch.Put(ctx, labelKey, metadataBytes); err != nil {
 			return status.Errorf(codes.Internal, "failed to put label key: %v", err)
 		}
 
@@ -314,34 +333,30 @@ func getLabels(record *corev1.Record) []string {
 	// get record skills
 	skills := make([]string, 0, len(recordData.GetSkills()))
 	for _, skill := range recordData.GetSkills() {
-		skills = append(skills, "/skills/"+skill.GetName())
+		skills = append(skills, validators.NamespaceSkills.Prefix()+skill.GetName())
 	}
 
 	labels = append(labels, skills...)
 
 	// get record domains
-	domainPrefix := "schema.oasf.agntcy.org/domains/"
-
 	var domains []string
 
 	for _, ext := range recordData.GetExtensions() {
-		if strings.HasPrefix(ext.GetName(), domainPrefix) {
-			domain := ext.GetName()[len(domainPrefix):]
-			domains = append(domains, "/domains/"+domain)
+		if strings.HasPrefix(ext.GetName(), validators.DomainSchemaPrefix) {
+			domain := ext.GetName()[len(validators.DomainSchemaPrefix):]
+			domains = append(domains, validators.NamespaceDomains.Prefix()+domain)
 		}
 	}
 
 	labels = append(labels, domains...)
 
 	// get record features
-	featuresPrefix := "schema.oasf.agntcy.org/features/"
-
 	var features []string
 
 	for _, ext := range recordData.GetExtensions() {
-		if strings.HasPrefix(ext.GetName(), featuresPrefix) {
-			feature := ext.GetName()[len(featuresPrefix):]
-			features = append(features, "/features/"+feature)
+		if strings.HasPrefix(ext.GetName(), validators.FeaturesSchemaPrefix) {
+			feature := ext.GetName()[len(validators.FeaturesSchemaPrefix):]
+			features = append(features, validators.NamespaceFeatures.Prefix()+feature)
 		}
 	}
 

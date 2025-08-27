@@ -1,6 +1,15 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
+// Package routing provides distributed content routing capabilities for the dir system.
+// It implements both local and remote routing strategies with automatic cleanup of stale data.
+//
+// The routing system consists of:
+// - Local routing: Fast queries against local datastore
+// - Remote routing: DHT-based discovery across the network
+// - Cleanup service: Automatic removal of stale labels and orphaned records
+//
+// Label metadata is stored in JSON format with timestamps for lifecycle management.
 package routing
 
 import (
@@ -17,6 +26,16 @@ import (
 type route struct {
 	local  *routeLocal
 	remote *routeRemote
+}
+
+// hasPeersInRoutingTable checks if we have any peers in the DHT routing table.
+// This determines whether we can perform network operations or should fall back to local-only mode.
+func (r *route) hasPeersInRoutingTable() bool {
+	if r.remote == nil || r.remote.server == nil {
+		return false
+	}
+
+	return r.remote.server.DHT().RoutingTable().Size() > 0
 }
 
 func New(ctx context.Context, store types.StoreAPI, opts types.APIOptions) (types.RoutingAPI, error) {
@@ -47,19 +66,25 @@ func New(ctx context.Context, store types.StoreAPI, opts types.APIOptions) (type
 }
 
 func (r *route) Publish(ctx context.Context, ref *corev1.RecordRef, record *corev1.Record) error {
-	// always publish data locally for archival/querying
-	err := r.local.Publish(ctx, ref, record)
+	// Get local peer ID from the remote server host
+	localPeerID := r.remote.server.Host().ID().String()
+
+	// Always publish data locally for archival/querying
+	err := r.local.Publish(ctx, ref, record, localPeerID)
 	if err != nil {
 		st := status.Convert(err)
 
 		return status.Errorf(st.Code(), "failed to publish locally: %s", st.Message())
 	}
 
-	err = r.remote.Publish(ctx, ref, record)
-	if err != nil {
-		st := status.Convert(err)
+	// Only publish to network if peers are available
+	if r.hasPeersInRoutingTable() {
+		err = r.remote.Publish(ctx, ref, record)
+		if err != nil {
+			st := status.Convert(err)
 
-		return status.Errorf(st.Code(), "failed to publish to the network: %s", st.Message())
+			return status.Errorf(st.Code(), "failed to publish to the network: %s", st.Message())
+		}
 	}
 
 	return nil
@@ -69,7 +94,8 @@ func (r *route) List(ctx context.Context, req *routingv1.ListRequest) (<-chan *r
 	// Use remote routing when:
 	// 1. Looking for a specific record (cid) - to find providers across the network
 	// 2. MaxHops is set - indicates network traversal
-	if req.GetLegacyListRequest().GetRef() != nil || req.GetLegacyListRequest().GetMaxHops() > 0 {
+	// But only if we have peers available for network operations
+	if (req.GetLegacyListRequest().GetRef() != nil || req.GetLegacyListRequest().GetMaxHops() > 0) && r.hasPeersInRoutingTable() {
 		return r.remote.List(ctx, req)
 	}
 
