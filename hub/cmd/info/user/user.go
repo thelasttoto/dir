@@ -16,6 +16,7 @@ import (
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	"github.com/agntcy/dir/hub/sessionstore"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
@@ -61,18 +62,39 @@ func NewCommand(_ *hubOptions.HubOptions) *cobra.Command {
 	return cmd
 }
 
-// renderUser renders user information in a formatted table-like output.
+// renderUser renders user information
 func renderUser(stream io.Writer, user *saasv1alpha1.User) {
-	fmt.Fprintf(stream, "  ID:         %s\n", user.GetId())
-	fmt.Fprintf(stream, "  Username:   %s\n", user.GetUsername())
+	const (
+		gapSize    = 4
+		labelWidth = 10
+	)
+
+	fields := []struct {
+		label string
+		value string
+	}{
+		{"ID:", user.GetId()},
+		{"Username:", user.GetUsername()},
+	}
 
 	if createdAt := user.GetCreatedAt(); createdAt != nil {
 		createdTime := time.Unix(createdAt.GetSeconds(), int64(createdAt.GetNanos()))
-		fmt.Fprintf(stream, "  Created:    %s\n", createdTime.Format(time.RFC3339))
+		fields = append(fields, struct {
+			label string
+			value string
+		}{"Created:", createdTime.Format(time.RFC3339)})
 	}
 
 	if updatedAt := user.GetUpdatedAt(); updatedAt != nil {
 		updatedTime := time.Unix(updatedAt.GetSeconds(), int64(updatedAt.GetNanos()))
-		fmt.Fprintf(stream, "  Updated:    %s\n", updatedTime.Format(time.RFC3339))
+		fields = append(fields, struct {
+			label string
+			value string
+		}{"Updated:", updatedTime.Format(time.RFC3339)})
+	}
+
+	for _, field := range fields {
+		labelCol := text.AlignLeft.Apply(field.label, labelWidth+gapSize)
+		fmt.Fprintf(stream, "  %s%s\n", labelCol, field.value)
 	}
 }

@@ -50,7 +50,7 @@ func DeleteAPIKey(
 	return resp, nil
 }
 
-// CreateAPIKey creates a new API key in the hub and returns the response.
+// ListAPIKeys lists API keys from the hub and returns the response.
 // It uses the provided session for authentication.
 func ListAPIKeys(
 	ctx context.Context,

@@ -17,6 +17,7 @@ import (
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	"github.com/agntcy/dir/hub/sessionstore"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
@@ -80,27 +81,53 @@ Examples:
 	return cmd
 }
 
-// renderOrganization renders organization information in a formatted table-like output.
+// renderOrganization renders organization information
 func renderOrganization(stream io.Writer, orgWithRole *saasv1alpha1.OrganizationWithRole) {
 	org := orgWithRole.GetOrganization()
 
-	fmt.Fprintf(stream, "  ID:          %s\n", org.GetId())
-	fmt.Fprintf(stream, "  Name:        %s\n", org.GetName())
+	const (
+		gapSize    = 4
+		labelWidth = 12
+	)
 
-	if org.GetDescription() != "" {
-		fmt.Fprintf(stream, "  Description: %s\n", org.GetDescription())
+	fields := []struct {
+		label string
+		value string
+	}{
+		{"ID:", org.GetId()},
+		{"Name:", org.GetName()},
 	}
 
-	// Use raw role enum string (same as orgs list)
-	fmt.Fprintf(stream, "  Role:        %s\n", orgWithRole.GetRole().String())
+	if org.GetDescription() != "" {
+		fields = append(fields, struct {
+			label string
+			value string
+		}{"Description:", org.GetDescription()})
+	}
+
+	fields = append(fields, struct {
+		label string
+		value string
+	}{"Role:", orgWithRole.GetRole().String()})
 
 	if createdAt := org.GetCreatedAt(); createdAt != nil {
 		createdTime := time.Unix(createdAt.GetSeconds(), int64(createdAt.GetNanos()))
-		fmt.Fprintf(stream, "  Created:     %s\n", createdTime.Format(time.RFC3339))
+		fields = append(fields, struct {
+			label string
+			value string
+		}{"Created:", createdTime.Format(time.RFC3339)})
 	}
 
 	if updatedAt := org.GetUpdatedAt(); updatedAt != nil {
 		updatedTime := time.Unix(updatedAt.GetSeconds(), int64(updatedAt.GetNanos()))
-		fmt.Fprintf(stream, "  Updated:     %s\n", updatedTime.Format(time.RFC3339))
+		fields = append(fields, struct {
+			label string
+			value string
+		}{"Updated:", updatedTime.Format(time.RFC3339)})
+	}
+
+	for _, field := range fields {
+		labelCol := text.AlignLeft.Apply(field.label, labelWidth+gapSize)
+		fmt.Fprintf(stream, "  %s%s\n", labelCol, field.value)
 	}
 }
