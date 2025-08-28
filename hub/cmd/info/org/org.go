@@ -81,7 +81,7 @@ Examples:
 	return cmd
 }
 
-// renderOrganization renders organization information
+// renderOrganization renders organization information.
 func renderOrganization(stream io.Writer, orgWithRole *saasv1alpha1.OrganizationWithRole) {
 	org := orgWithRole.GetOrganization()
 

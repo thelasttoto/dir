@@ -62,7 +62,7 @@ func NewCommand(_ *hubOptions.HubOptions) *cobra.Command {
 	return cmd
 }
 
-// renderUser renders user information
+// renderUser renders user information.
 func renderUser(stream io.Writer, user *saasv1alpha1.User) {
 	const (
 		gapSize    = 4
