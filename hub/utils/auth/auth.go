@@ -1,3 +1,6 @@
+// Copyright AGNTCY Contributors (https://github.com/agntcy)
+// SPDX-License-Identifier: Apache-2.0
+
 package auth
 
 import (
@@ -19,7 +22,7 @@ func CheckForCreds(cmd *cobra.Command, currentSession *sessionstore.HubSession, 
 	}
 
 	if !baseauth.HasLoginCreds(currentSession) && !baseauth.HasAPIKey(currentSession) {
-		return errors.New("you need to be logged to execute this action.\nuse `dirctl hub login` command to login.")
+		return errors.New("you need to be logged to execute this action\nuse `dirctl hub login` command to login")
 	}
 
 	return nil

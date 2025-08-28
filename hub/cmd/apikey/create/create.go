@@ -76,7 +76,8 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 
 	// Check for credentials
 	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress); err != nil {
-		return err
+		// this error need to be return without modification in order to be displayed
+		return err //nolint:wrapcheck
 	}
 
 	hc, err := hubClient.New(currentSession.HubBackendAddress)

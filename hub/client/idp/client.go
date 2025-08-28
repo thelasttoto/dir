@@ -141,8 +141,10 @@ func (c *client) GetAccessTokenFromOkta(ctx context.Context, clientID string, se
 
 func handleTokenResponse(resp *http.Response) (*GetAccessTokenResponse, error) {
 	var body []byte
+
 	if resp.Body != nil {
 		var err error
+
 		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body: %w", err)
