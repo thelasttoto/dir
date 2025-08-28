@@ -4,9 +4,6 @@ package saas.v1alpha1;
 
 option go_package = "github.com/cisco-eti/phoenix-saas-be/api/saas/v1alpha1";
 
-import "buf/validate/validate.proto";
-import "core/v1alpha1/object.proto";
-import "google/api/annotations.proto";
 import "saas/v1alpha1/record.proto";
 import "saas/v1alpha1/timestamp_range.proto";
 
@@ -17,9 +14,9 @@ message RecordFetch {
 }
 
 message FetchRecordsRequest {
-  repeated string record_types = 1;//agent,mcp,a2a
+  repeated string record_types = 1; //agent,mcp,a2a
   TimestampRange time_range = 2;
-  repeated string tenant_ids = 3;
+  repeated string organization_ids = 3;
 }
 
 message FetchRecordsResponse {
@@ -28,9 +25,7 @@ message FetchRecordsResponse {
   optional RecordFetch a2a = 3;
 }
 
-// This API should communicate with the Search Service
+// This GRPC only API should communicate with the Search Service
 service SearchService {
-  rpc FetchRecords(FetchRecordsRequest) returns (FetchRecordsResponse) {
-    option (google.api.http) = {get: "/v1alpha1/records/fetch"};
-  }
+  rpc FetchRecords(FetchRecordsRequest) returns (FetchRecordsResponse);
 }

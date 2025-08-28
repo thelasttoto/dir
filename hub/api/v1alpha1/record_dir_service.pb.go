@@ -109,7 +109,6 @@ type isPushRecordRequest_Repository interface {
 }
 
 type PushRecordRequest_RepositoryId struct {
-	// option (buf.validate.oneof).required = true;
 	RepositoryId string `protobuf:"bytes,1,opt,name=repository_id,json=repositoryId,proto3,oneof"`
 }
 

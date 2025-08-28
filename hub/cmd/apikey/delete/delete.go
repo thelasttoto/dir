@@ -7,12 +7,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/cmd/apikey/options"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	service "github.com/agntcy/dir/hub/service"
 	"github.com/agntcy/dir/hub/sessionstore"
+	authUtils "github.com/agntcy/dir/hub/utils/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -56,16 +56,10 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.APIKeyDeleteOpt
 		return errors.New("could not get current hub session")
 	}
 
-	if !auth.HasLoginCreds(currentSession) && auth.HasAPIKey(currentSession) {
-		fmt.Fprintf(cmd.OutOrStdout(), "User is authenticated with API key, using it to get credentials...\n")
-
-		if err := auth.RefreshAPIKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
-			return fmt.Errorf("failed to refresh API key access token: %w", err)
-		}
-	}
-
-	if !auth.HasLoginCreds(currentSession) && !auth.HasAPIKey(currentSession) {
-		return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
+	// Check for credentials
+	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress); err != nil {
+		// this error need to be return without modification in order to be displayed
+		return err //nolint:wrapcheck
 	}
 
 	hc, err := hubClient.New(currentSession.HubBackendAddress)
