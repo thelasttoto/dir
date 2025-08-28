@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// Path to the IDP API for retreiving an AccessToken for ApiKey Access.
+	// Path to the IDP API for retrieving an AccessToken for ApiKey Access.
 	AccessTokenEndpoint = "/v1/token"
 	// Fixed Client ID for the access token request. THIS IS NOT THE CLIENT ID THAT WILL BE IN ACCESS TOKEN.
 	AccessTokenClientID = "0oackfvbjvy65qVi41d7" //nolint:gosec
@@ -26,7 +26,7 @@ const (
 	AccessTokenGrantType = "password"
 	// AccessTokenGrantTypeClientCredentials is the grant type for client credentials.
 	AccessTokenGrantTypeClientCredentials = "client_credentials"
-	AccessTokenCustomScope                = "customScope" // Custom scope for the access token request, can be changed as needed.
+	AccessTokenCustomScope                = "customScope" // Custom scope for the access token request.
 )
 
 // GetAccessTokenResponse contains the response when requesting an access token from the IDP API.
@@ -102,24 +102,7 @@ func (c *client) GetAccessTokenFromAPIKey(ctx context.Context, username string, 
 	}
 	defer resp.Body.Close()
 
-	var body []byte
-	if resp.Body != nil {
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
-	}
-
-	if resp.StatusCode == http.StatusOK {
-		var parsedResponse *GetAccessTokenResponse
-		if err = json.Unmarshal(body, &parsedResponse); err != nil {
-			return nil, fmt.Errorf("failed to parse response: %w", err)
-		}
-
-		return parsedResponse, nil
-	}
-
-	return nil, fmt.Errorf("bad response status code: %d, body: %s", resp.StatusCode, string(body))
+	return handleTokenResponse(resp)
 }
 
 /*
@@ -153,8 +136,13 @@ func (c *client) GetAccessTokenFromOkta(ctx context.Context, clientID string, se
 	}
 	defer resp.Body.Close()
 
+	return handleTokenResponse(resp)
+}
+
+func handleTokenResponse(resp *http.Response) (*GetAccessTokenResponse, error) {
 	var body []byte
 	if resp.Body != nil {
+		var err error
 		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body: %w", err)
@@ -163,7 +151,7 @@ func (c *client) GetAccessTokenFromOkta(ctx context.Context, clientID string, se
 
 	if resp.StatusCode == http.StatusOK {
 		var parsedResponse *GetAccessTokenResponse
-		if err = json.Unmarshal(body, &parsedResponse); err != nil {
+		if err := json.Unmarshal(body, &parsedResponse); err != nil {
 			return nil, fmt.Errorf("failed to parse response: %w", err)
 		}
 

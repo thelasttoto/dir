@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// This API should communicate with the Search Service
+// This GRPC only API should communicate with the Search Service
 type SearchServiceClient interface {
 	FetchRecords(ctx context.Context, in *FetchRecordsRequest, opts ...grpc.CallOption) (*FetchRecordsResponse, error)
 }
@@ -53,7 +53,7 @@ func (c *searchServiceClient) FetchRecords(ctx context.Context, in *FetchRecords
 // All implementations should embed UnimplementedSearchServiceServer
 // for forward compatibility.
 //
-// This API should communicate with the Search Service
+// This GRPC only API should communicate with the Search Service
 type SearchServiceServer interface {
 	FetchRecords(context.Context, *FetchRecordsRequest) (*FetchRecordsResponse, error)
 }

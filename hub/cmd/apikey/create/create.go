@@ -9,12 +9,12 @@ import (
 	"fmt"
 
 	v1alpha1 "github.com/agntcy/dir/hub/api/v1alpha1"
-	"github.com/agntcy/dir/hub/auth"
 	hubClient "github.com/agntcy/dir/hub/client/hub"
 	"github.com/agntcy/dir/hub/cmd/apikey/options"
 	hubOptions "github.com/agntcy/dir/hub/cmd/options"
 	service "github.com/agntcy/dir/hub/service"
 	"github.com/agntcy/dir/hub/sessionstore"
+	authUtils "github.com/agntcy/dir/hub/utils/auth"
 	"github.com/agntcy/dir/hub/utils/file"
 	"github.com/spf13/cobra"
 )
@@ -74,16 +74,9 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 		return errors.New("could not get current hub session")
 	}
 
-	if !auth.HasLoginCreds(currentSession) && auth.HasAPIKey(currentSession) {
-		fmt.Fprintf(cmd.OutOrStdout(), "User is authenticated with API key, using it to get credentials...")
-
-		if err := auth.RefreshAPIKeyAccessToken(cmd.Context(), currentSession, opts.ServerAddress); err != nil {
-			return fmt.Errorf("failed to refresh API key access token: %w", err)
-		}
-	}
-
-	if !auth.HasLoginCreds(currentSession) && !auth.HasAPIKey(currentSession) {
-		return errors.New("you need to be logged in to push to the hub\nuse `dirctl hub login` command to login")
+	// Check for credentials
+	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress); err != nil {
+		return err
 	}
 
 	hc, err := hubClient.New(currentSession.HubBackendAddress)
@@ -100,7 +93,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 
 	prettyModel, err := json.MarshalIndent(resp.GetToken(), "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal agent: %w", err)
+		return fmt.Errorf("failed to marshal API key: %w", err)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(prettyModel))

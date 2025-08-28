@@ -15,7 +15,6 @@ import "saas/v1alpha1/pagination_param.proto";
 message CreateApiKeyRequest {
   Role role = 1;
   oneof organization {
-    // option (buf.validate.oneof).required = true;
     string organization_id = 2 [(buf.validate.field).string.uuid = true];
     string organization_name = 3 [
       (buf.validate.field).string.max_len = 100
@@ -35,7 +34,6 @@ message DeleteApiKeyResponse {}
 
 message ListApiKeyRequest {
   oneof organization {
-    // option (buf.validate.oneof).required = true;
     string organization_id = 1[(buf.validate.field).string.uuid = true];
     string organization_name = 2 [
       (buf.validate.field).string.max_len = 100

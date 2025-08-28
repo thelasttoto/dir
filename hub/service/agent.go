@@ -85,9 +85,9 @@ func ParseRepoTagID(id string) any {
 	return &v1alpha1.PushRecordRequest_RepositoryName{RepositoryName: id}
 }
 
-// ParseOrganisationName parses an organization name string from a Repository.
+// ParseOrganizationName parses an organization name string from a Repository.
 // Returns an OrganizationName.
-func ParseOrganisationName(repository string) (string, error) {
+func ParseOrganizationName(repository string) (string, error) {
 	const orgPartsNumber = 2
 
 	parts := strings.Split(repository, "/")

@@ -91,7 +91,6 @@ type isRepositoryIdentifier_Id interface {
 }
 
 type RepositoryIdentifier_DbId struct {
-	// option (buf.validate.oneof).required = true;
 	DbId string `protobuf:"bytes,1,opt,name=db_id,json=dbId,proto3,oneof"`
 }
 

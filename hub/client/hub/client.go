@@ -191,7 +191,7 @@ func (c *client) CreateAPIKey(ctx context.Context, roleName string, organization
 		fmt.Fprintf(os.Stdout, "Creating API key for organization id: %v\n", parsedOrg)
 		req.Organization = parsedOrg
 	default:
-		return nil, fmt.Errorf("unknown organisation type: %T", organization)
+		return nil, fmt.Errorf("unknown organization type: %T", organization)
 	}
 
 	stream, err := c.ApiKeyServiceClient.CreateAPIKey(ctx, req)
@@ -237,7 +237,7 @@ func (c *client) ListAPIKeys(ctx context.Context, organization any) (*v1alpha1.L
 		fmt.Fprintf(os.Stdout, "Listing API keys for organization id: %v\n", parsedOrg)
 		req.Organization = parsedOrg
 	default:
-		return nil, fmt.Errorf("unknown organisation type: %T", organization)
+		return nil, fmt.Errorf("unknown organization type: %T", organization)
 	}
 
 	resp, err := c.ApiKeyServiceClient.ListApiKey(ctx, req)

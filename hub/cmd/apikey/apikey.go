@@ -12,13 +12,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCommand creates the "pull" command for the Agent Hub CLI.
-// It pulls an agent from the hub by digest or repository:version and prints the result.
+// NewCommand creates all apikey commands for the Agent Hub CLI.
 // Returns the configured *cobra.Command.
 func NewCommand(hubOpts *options.HubOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apikey",
-		Short: "Manage the Agent Hub",
+		Short: "Manage the Agent Hub API keys",
 
 		TraverseChildren: true,
 	}

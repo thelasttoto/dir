@@ -101,7 +101,6 @@ type isCreateApiKeyRequest_Organization interface {
 }
 
 type CreateApiKeyRequest_OrganizationId struct {
-	// option (buf.validate.oneof).required = true;
 	OrganizationId string `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3,oneof"`
 }
 
@@ -323,7 +322,6 @@ type isListApiKeyRequest_Organization interface {
 }
 
 type ListApiKeyRequest_OrganizationId struct {
-	// option (buf.validate.oneof).required = true;
 	OrganizationId string `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3,oneof"`
 }
 
