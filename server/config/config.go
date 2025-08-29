@@ -99,8 +99,14 @@ func LoadConfig() (*Config, error) {
 	//
 	// Authz configuration
 	//
+	_ = v.BindEnv("authz.enabled")
+	v.SetDefault("authz.enabled", "false")
+
 	_ = v.BindEnv("authz.socket_path")
 	v.SetDefault("authz.socket_path", "")
+
+	_ = v.BindEnv("authz.trust_domain")
+	v.SetDefault("authz.trust_domain", "")
 
 	//
 	// Provider configuration
