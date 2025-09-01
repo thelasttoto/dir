@@ -39,7 +39,7 @@ type AuthConfig struct {
 	IdpBackendAddress  string `json:"idp_backend"`
 	IdpIssuerAddress   string `json:"idp_issuer"`
 	HubBackendAddress  string `json:"hub_backend"`
-	ApiKeyClientID     string `json:"api_key_client_id"`
+	APIKeyClientID     string `json:"api_key_client_id"`
 }
 
 type APIKey struct {
