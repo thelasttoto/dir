@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 
-	corev1 "github.com/agntcy/dir/api/core/v1"
 	routingv1 "github.com/agntcy/dir/api/routing/v1"
 	"github.com/agntcy/dir/server/types"
 	"github.com/agntcy/dir/utils/logging"
@@ -19,14 +18,16 @@ var routingLogger = logging.Logger("controller/routing")
 
 type routingCtlr struct {
 	routingv1.UnimplementedRoutingServiceServer
-	routing types.RoutingAPI
-	store   types.StoreAPI
+	routing     types.RoutingAPI
+	store       types.StoreAPI
+	publication types.PublicationAPI
 }
 
-func NewRoutingController(routing types.RoutingAPI, store types.StoreAPI) routingv1.RoutingServiceServer {
+func NewRoutingController(routing types.RoutingAPI, store types.StoreAPI, publication types.PublicationAPI) routingv1.RoutingServiceServer {
 	return &routingCtlr{
 		routing:                           routing,
 		store:                             store,
+		publication:                       publication,
 		UnimplementedRoutingServiceServer: routingv1.UnimplementedRoutingServiceServer{},
 	}
 }
@@ -34,23 +35,15 @@ func NewRoutingController(routing types.RoutingAPI, store types.StoreAPI) routin
 func (c *routingCtlr) Publish(ctx context.Context, req *routingv1.PublishRequest) (*emptypb.Empty, error) {
 	routingLogger.Debug("Called routing controller's Publish method", "req", req)
 
-	ref := &corev1.RecordRef{
-		Cid: req.GetRecordCid(),
-	}
-
-	record, err := c.getRecord(ctx, ref)
+	// Create publication to be handled by the publication service
+	publicationID, err := c.publication.CreatePublication(ctx, req)
 	if err != nil {
-		st := status.Convert(err)
+		routingLogger.Error("Failed to create publication", "error", err)
 
-		return nil, status.Errorf(st.Code(), "failed to get record: %s", st.Message())
+		return nil, status.Errorf(codes.Internal, "failed to create publication: %v", err)
 	}
 
-	err = c.routing.Publish(ctx, ref, record)
-	if err != nil {
-		st := status.Convert(err)
-
-		return nil, status.Errorf(st.Code(), "failed to publish: %s", st.Message())
-	}
+	routingLogger.Info("Publication created successfully", "publication_id", publicationID)
 
 	return &emptypb.Empty{}, nil
 }
@@ -81,50 +74,11 @@ func (c *routingCtlr) List(req *routingv1.ListRequest, srv routingv1.RoutingServ
 	return nil
 }
 
-func (c *routingCtlr) Unpublish(ctx context.Context, req *routingv1.UnpublishRequest) (*emptypb.Empty, error) {
+func (c *routingCtlr) Unpublish(_ context.Context, req *routingv1.UnpublishRequest) (*emptypb.Empty, error) {
 	routingLogger.Debug("Called routing controller's Unpublish method", "req", req)
 
-	ref := &corev1.RecordRef{
-		Cid: req.GetRecordCid(),
-	}
-
-	record, err := c.getRecord(ctx, ref)
-	if err != nil {
-		st := status.Convert(err)
-
-		return nil, status.Errorf(st.Code(), "failed to get record: %s", st.Message())
-	}
-
-	err = c.routing.Unpublish(ctx, ref, record)
-	if err != nil {
-		st := status.Convert(err)
-
-		return nil, status.Errorf(st.Code(), "failed to unpublish: %s", st.Message())
-	}
+	// Unpublish is intentionally not implemented.
+	// Records will be deleted from the network once their retention period (TTL) expires.
 
 	return &emptypb.Empty{}, nil
-}
-
-func (c *routingCtlr) getRecord(ctx context.Context, ref *corev1.RecordRef) (*corev1.Record, error) {
-	routingLogger.Debug("Called routing controller's getRecord method", "ref", ref)
-
-	if ref == nil || ref.GetCid() == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "object reference is required and must have a type")
-	}
-
-	_, err := c.store.Lookup(ctx, ref)
-	if err != nil {
-		st := status.Convert(err)
-
-		return nil, status.Errorf(st.Code(), "failed to lookup object: %s", st.Message())
-	}
-
-	record, err := c.store.Pull(ctx, ref)
-	if err != nil {
-		st := status.Convert(err)
-
-		return nil, status.Errorf(st.Code(), "failed to pull object: %s", st.Message())
-	}
-
-	return record, nil
 }
