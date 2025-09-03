@@ -18,13 +18,13 @@ var validatorLogger = logging.Logger("routing/validators")
 // BaseValidator provides common validation logic for all label validators.
 type BaseValidator struct{}
 
-// validateKeyFormat validates the basic DHT key format.
+// validateKeyFormat validates the enhanced DHT key format with PeerID.
 func (v *BaseValidator) validateKeyFormat(key string, expectedNamespace string) ([]string, error) {
-	// Parse key format: /<namespace>/<specific_path>/<cid>
-	// Minimum parts: ["", "namespace", "path", "cid"]
+	// Parse enhanced key format: /<namespace>/<specific_path>/<cid>/<peer_id>
+	// Minimum parts: ["", "namespace", "path", "cid", "peer_id"]
 	parts := strings.Split(key, "/")
 	if len(parts) < MinLabelKeyParts {
-		return nil, errors.New("invalid key format: expected /<namespace>/<specific_path>/<cid>")
+		return nil, errors.New("invalid key format: expected /<namespace>/<specific_path>/<cid>/<peer_id>")
 	}
 
 	// Validate namespace
@@ -32,8 +32,19 @@ func (v *BaseValidator) validateKeyFormat(key string, expectedNamespace string) 
 		return nil, errors.New("invalid namespace: expected " + expectedNamespace + ", got " + parts[1])
 	}
 
-	// Extract and validate CID (last part)
-	cidStr := parts[len(parts)-1]
+	// Extract and validate PeerID (last part) first
+	peerID := parts[len(parts)-1]
+	if peerID == "" {
+		return nil, errors.New("missing PeerID in key")
+	}
+
+	// Check if the last part looks like a CID (common mistake)
+	if _, err := cid.Decode(peerID); err == nil {
+		return nil, errors.New("invalid key format: expected /<namespace>/<specific_path>/<cid>/<peer_id>")
+	}
+
+	// Extract and validate CID (second to last part)
+	cidStr := parts[len(parts)-2]
 	if cidStr == "" {
 		return nil, errors.New("missing CID in key")
 	}
@@ -116,15 +127,14 @@ func (v *SkillValidator) Validate(key string, value []byte) error {
 
 // validateSkillsSpecific performs skills-specific validation logic.
 func (v *SkillValidator) validateSkillsSpecific(parts []string) error {
-	// parts[0] = "", parts[1] = "skills", parts[2:len-1] = skill path components, parts[len-1] = cid
-	// Minimum: /skills/<skill_path>/<cid> = MinLabelKeyParts
-	// Examples: /skills/golang/CID or /skills/programming/golang/CID
+	// parts[0] = "", parts[1] = "skills", parts[2:len-2] = skill path components, parts[len-2] = cid, parts[len-1] = peer_id
+	// Enhanced format: /skills/<skill_path>/<cid>/<peer_id>
 	if len(parts) < MinLabelKeyParts {
-		return errors.New("skills key must have format: /skills/<skill_path>/<cid>")
+		return errors.New("skills key must have format: /skills/<skill_path>/<cid>/<peer_id>")
 	}
 
 	// Extract skill path (everything between "skills" and CID)
-	skillParts := parts[2 : len(parts)-1]
+	skillParts := parts[2 : len(parts)-2] // Exclude CID and PeerID
 	if len(skillParts) == 0 {
 		return errors.New("skill path cannot be empty")
 	}
@@ -184,13 +194,14 @@ func (v *DomainValidator) Validate(key string, value []byte) error {
 
 // validateDomainsSpecific performs domains-specific validation logic.
 func (v *DomainValidator) validateDomainsSpecific(parts []string) error {
-	// parts[0] = "", parts[1] = "domains", parts[2+] = domain path components, last = cid
+	// parts[0] = "", parts[1] = "domains", parts[2:len-2] = domain path components, parts[len-2] = cid, parts[len-1] = peer_id
+	// Enhanced format: /domains/<domain_path>/<cid>/<peer_id>
 	if len(parts) < MinLabelKeyParts {
-		return errors.New("domains key must have format: /domains/<domain_path>/<cid>")
+		return errors.New("domains key must have format: /domains/<domain_path>/<cid>/<peer_id>")
 	}
 
 	// Extract domain path (everything between "domains" and CID)
-	domainParts := parts[2 : len(parts)-1]
+	domainParts := parts[2 : len(parts)-2] // Exclude CID and PeerID
 	if len(domainParts) == 0 {
 		return errors.New("domain path cannot be empty")
 	}
@@ -243,13 +254,14 @@ func (v *FeatureValidator) Validate(key string, value []byte) error {
 
 // validateFeaturesSpecific performs features-specific validation logic.
 func (v *FeatureValidator) validateFeaturesSpecific(parts []string) error {
-	// parts[0] = "", parts[1] = "features", parts[2+] = feature path components, last = cid
+	// parts[0] = "", parts[1] = "features", parts[2:len-2] = feature path components, parts[len-2] = cid, parts[len-1] = peer_id
+	// Enhanced format: /features/<feature_path>/<cid>/<peer_id>
 	if len(parts) < MinLabelKeyParts {
-		return errors.New("features key must have format: /features/<feature_path>/<cid>")
+		return errors.New("features key must have format: /features/<feature_path>/<cid>/<peer_id>")
 	}
 
 	// Extract feature path (everything between "features" and CID)
-	featureParts := parts[2 : len(parts)-1]
+	featureParts := parts[2 : len(parts)-2] // Exclude CID and PeerID
 	if len(featureParts) == 0 {
 		return errors.New("feature path cannot be empty")
 	}
@@ -268,12 +280,80 @@ func (v *FeatureValidator) Select(key string, values [][]byte) (int, error) {
 	return v.selectFirstValid(key, values, v.Validate)
 }
 
+// LocatorValidator validates DHT records for locator-based content discovery.
+type LocatorValidator struct {
+	BaseValidator
+}
+
+// Validate validates a locators DHT record.
+// Key format: /locators/<locator_type>/<cid>/<peer_id>
+// Future: Can validate against supported locator types, registry, etc.
+func (v *LocatorValidator) Validate(key string, value []byte) error {
+	validatorLogger.Debug("Validating locators DHT record", "key", key)
+
+	// Basic format validation
+	parts, err := v.validateKeyFormat(key, NamespaceLocators.String())
+	if err != nil {
+		return err
+	}
+
+	// Locators-specific validation
+	if err := v.validateLocatorsSpecific(parts); err != nil {
+		return err
+	}
+
+	// Value validation
+	if err := v.validateValue(value); err != nil {
+		return err
+	}
+
+	validatorLogger.Debug("Locators DHT record validation successful", "key", key)
+
+	return nil
+}
+
+// validateLocatorsSpecific performs locators-specific validation logic.
+func (v *LocatorValidator) validateLocatorsSpecific(parts []string) error {
+	// parts[0] = "", parts[1] = "locators", parts[2:len-2] = locator path components, parts[len-2] = cid, parts[len-1] = peer_id
+	// Enhanced format: /locators/<locator_type>/<cid>/<peer_id>
+	if len(parts) < MinLabelKeyParts {
+		return errors.New("locators key must have format: /locators/<locator_type>/<cid>/<peer_id>")
+	}
+
+	// Extract locator type (everything between "locators" and CID)
+	locatorParts := parts[2 : len(parts)-2] // Exclude CID and PeerID
+	if len(locatorParts) == 0 {
+		return errors.New("locator type cannot be empty")
+	}
+
+	// Validate that none of the locator path components are empty
+	for i, part := range locatorParts {
+		if part == "" {
+			return errors.New("locator path component cannot be empty at position " + strconv.Itoa(i+1))
+		}
+	}
+
+	// Future: validate against supported locator types
+	// locatorType := strings.Join(locatorParts, "/")
+	// if !v.isValidLocatorType(locatorType) {
+	//     return errors.New("invalid locator type: " + locatorType)
+	// }
+
+	return nil
+}
+
+// Select chooses between multiple values for locators records.
+func (v *LocatorValidator) Select(key string, values [][]byte) (int, error) {
+	return v.selectFirstValid(key, values, v.Validate)
+}
+
 // CreateLabelValidators creates separate validators for each label namespace.
 func CreateLabelValidators() map[string]record.Validator {
 	return map[string]record.Validator{
 		NamespaceSkills.String():   &SkillValidator{},
 		NamespaceDomains.String():  &DomainValidator{},
 		NamespaceFeatures.String(): &FeatureValidator{},
+		NamespaceLocators.String(): &LocatorValidator{},
 	}
 }
 
@@ -316,11 +396,12 @@ func FormatLabelKey(label, cidStr string) string {
 	return key
 }
 
-// Example: "/skills/golang/CID123" → "CID123", nil.
+// ExtractCIDFromLabelKey extracts CID from enhanced label key format.
+// Example: "/skills/golang/CID123/Peer1" → "CID123", nil.
 func ExtractCIDFromLabelKey(labelKey string) (string, error) {
 	parts := strings.Split(labelKey, "/")
 	if len(parts) < MinLabelKeyParts {
-		return "", errors.New("invalid label key format: expected /<namespace>/<label_path>/<cid>")
+		return "", errors.New("invalid enhanced key format: expected /<namespace>/<label_path>/<cid>/<peer_id>")
 	}
 
 	// Validate it's a proper namespace key
@@ -328,8 +409,8 @@ func ExtractCIDFromLabelKey(labelKey string) (string, error) {
 		return "", errors.New("invalid namespace in label key")
 	}
 
-	// Extract and validate CID (last part)
-	cidStr := parts[len(parts)-1]
+	// Extract and validate CID (second to last part)
+	cidStr := parts[len(parts)-2]
 	if cidStr == "" {
 		return "", errors.New("missing CID in label key")
 	}
