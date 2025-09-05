@@ -75,7 +75,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 	}
 
 	// Check for credentials
-	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JsonOutput); err != nil {
+	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JSONOutput); err != nil {
 		// this error need to be return without modification in order to be displayed
 		return err //nolint:wrapcheck
 	}
@@ -92,16 +92,16 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 
 	// Apikeywithsecret will not be shown for security reasons. Use apikey instead.
 	apikey := &service.APIKeyWithRoleName{
-		ClientId: apikeyWithSecret.ClientId,
+		ClientID: apikeyWithSecret.ClientID,
 		RoleName: apikeyWithSecret.RoleName,
 	}
 
-	if !opts.JsonOutput {
+	if !opts.JSONOutput {
 		fmt.Fprintf(cmd.OutOrStdout(), "API Key created successfully:\n")
 	}
 
 	currentSession.APIKeyAccess = &sessionstore.APIKey{
-		ClientID: apikeyWithSecret.ClientId,
+		ClientID: apikeyWithSecret.ClientID,
 		Secret:   apikeyWithSecret.Secret,
 	}
 
@@ -119,7 +119,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyCreateOption
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(prettyModel))
 
-	if !opts.JsonOutput {
+	if !opts.JSONOutput {
 		fmt.Fprintf(cmd.OutOrStdout(), "The API Key has been added to your session file.\n")
 	}
 

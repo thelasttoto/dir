@@ -74,7 +74,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyListOptions)
 	}
 
 	// Check for credentials
-	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JsonOutput); err != nil {
+	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JSONOutput); err != nil {
 		// this error need to be return without modification in order to be displayed
 		return err //nolint:wrapcheck
 	}
@@ -90,7 +90,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyListOptions)
 		return fmt.Errorf("failed to list API keys: %w", err)
 	}
 
-	if !opts.JsonOutput {
+	if !opts.JSONOutput {
 		fmt.Fprintf(cmd.OutOrStdout(), "API Keys for organization %v:\n", organization)
 	}
 
@@ -104,6 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string, opts *options.APIKeyListOptions)
 func renderList(stream io.Writer, apikeys []*service.APIKeyWithRoleName) error {
 	if len(apikeys) == 0 {
 		fmt.Fprintf(stream, "[]\n")
+
 		return nil
 	}
 
@@ -113,5 +114,6 @@ func renderList(stream io.Writer, apikeys []*service.APIKeyWithRoleName) error {
 	}
 
 	fmt.Fprintf(stream, "%s\n", string(prettyModel))
+
 	return nil
 }

@@ -15,12 +15,12 @@ import (
 
 // A structure that combines an API key with its associated role name.
 type APIKeyWithRoleName struct {
-	ClientId string `json:"client_id"` // The client ID of the API key.
+	ClientID string `json:"client_id"` // The client ID of the API key.
 	RoleName string `json:"role_name"` // The name of the role associated with the API key.
 }
 
 type APIKeyWithSecretWithRoleName struct {
-	ClientId string `json:"client_id"` // The client ID of the API key.
+	ClientID string `json:"client_id"` // The client ID of the API key.
 	Secret   string `json:"secret"`    // The secret of the API key.
 	RoleName string `json:"role_name"` // The name of the role associated
 }
@@ -47,11 +47,11 @@ func CreateAPIKey(
 
 	roleName, ok := v1alpha1.Role_name[int32(resp.GetToken().GetApikey().GetRole())]
 	if !ok {
-		return nil, fmt.Errorf("Invalid role: %v", resp.GetToken().GetApikey().GetRole())
+		return nil, fmt.Errorf("invalid role: %v", resp.GetToken().GetApikey().GetRole())
 	}
 
 	return &APIKeyWithSecretWithRoleName{
-		ClientId: resp.GetToken().GetApikey().GetClientId(),
+		ClientID: resp.GetToken().GetApikey().GetClientId(),
 		Secret:   resp.GetToken().GetSecret(),
 		RoleName: roleName,
 	}, nil
@@ -90,16 +90,18 @@ func ListAPIKeys(
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}
 
-	var apiKeysWithRoleNames []*APIKeyWithRoleName
-	for _, apiKey := range resp.GetApikeys() {
+	apiKeysWithRoleNames := make([]*APIKeyWithRoleName, len(resp.GetApikeys()))
+
+	for i, apiKey := range resp.GetApikeys() {
 		roleName, ok := v1alpha1.Role_name[int32(apiKey.GetRole())]
 		if !ok {
-			return nil, fmt.Errorf("Invalid role: %v", apiKey.GetRole())
+			return nil, fmt.Errorf("invalid role: %v", apiKey.GetRole())
 		}
-		apiKeysWithRoleNames = append(apiKeysWithRoleNames, &APIKeyWithRoleName{
-			ClientId: apiKey.GetClientId(),
+
+		apiKeysWithRoleNames[i] = &APIKeyWithRoleName{
+			ClientID: apiKey.GetClientId(),
 			RoleName: roleName,
-		})
+		}
 	}
 
 	return apiKeysWithRoleNames, nil

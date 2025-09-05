@@ -46,7 +46,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.APIKeyDeleteOpt
 
 	// Retrieve the API key Client ID to delete from the command arguments
 	clientID := args[0]
-	if !opts.JsonOutput {
+	if !opts.JSONOutput {
 		fmt.Fprintf(cmd.OutOrStdout(), "Deleting API key with Client ID: %s\n", clientID)
 	}
 
@@ -59,7 +59,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.APIKeyDeleteOpt
 	}
 
 	// Check for credentials
-	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JsonOutput); err != nil {
+	if err := authUtils.CheckForCreds(cmd, currentSession, opts.ServerAddress, opts.JSONOutput); err != nil {
 		// this error need to be return without modification in order to be displayed
 		return err //nolint:wrapcheck
 	}
@@ -74,7 +74,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.APIKeyDeleteOpt
 		return fmt.Errorf("failed to delete API key: %w", err)
 	}
 
-	if !opts.JsonOutput {
+	if !opts.JSONOutput {
 		fmt.Fprintf(cmd.OutOrStdout(), "API Key '%s' deleted successfully\n", clientID)
 	}
 

@@ -11,7 +11,7 @@ import (
 type APIKeyDeleteOptions struct {
 	*options.HubOptions
 
-	JsonOutput bool
+	JSONOutput bool
 }
 
 func NewAPIKeyDeleteOptions(hubOptions *options.HubOptions, cmd *cobra.Command) *APIKeyDeleteOptions {
@@ -20,7 +20,7 @@ func NewAPIKeyDeleteOptions(hubOptions *options.HubOptions, cmd *cobra.Command) 
 	}
 
 	opt.AddRegisterFn(func() error {
-		cmd.Flags().BoolVarP(&opt.JsonOutput, "json", "j", false, "Output in JSON format")
+		cmd.Flags().BoolVarP(&opt.JSONOutput, "json", "j", false, "Output in JSON format")
 
 		return nil
 	})
