@@ -14,6 +14,7 @@ import (
 	objectsv3 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v3"
 	routingv1 "github.com/agntcy/dir/api/routing/v1"
 	clicmd "github.com/agntcy/dir/cli/cmd"
+	searchcmd "github.com/agntcy/dir/cli/cmd/search"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -388,4 +389,27 @@ func ResetCLIState() {
 	// Clear any output buffers by setting output to default
 	clicmd.RootCmd.SetOut(nil)
 	clicmd.RootCmd.SetErr(nil)
+
+	// Reset search command global state
+	ResetSearchCommandState()
+}
+
+// ResetSearchCommandState resets the global state in search command.
+//
+//nolint:errcheck
+func ResetSearchCommandState() {
+	if cmd := searchcmd.Command; cmd != nil {
+		// Reset flags to default values
+		cmd.Flags().Set("limit", "100")
+		cmd.Flags().Set("offset", "0")
+
+		// For the query flag, reset it by accessing the underlying value
+		if queryFlag := cmd.Flags().Lookup("query"); queryFlag != nil {
+			queryFlag.Changed = false
+			// Cast to the Query type and reset it
+			if queryValue, ok := queryFlag.Value.(*searchcmd.Query); ok {
+				*queryValue = searchcmd.Query{}
+			}
+		}
+	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/agntcy/dir/server/database/utils"
 	"github.com/agntcy/dir/server/types"
 	"gorm.io/gorm"
 )
@@ -149,7 +150,7 @@ func (d *DB) AddRecord(record types.Record) error {
 }
 
 // GetRecords retrieves records based on the provided options.
-func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.Record, error) { //nolint:cyclop
+func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.Record, error) {
 	// Create default configuration.
 	cfg := &types.RecordFilters{}
 
@@ -174,53 +175,8 @@ func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.Record, error) { //
 		query = query.Offset(cfg.Offset)
 	}
 
-	// Apply record-level filters.
-	if cfg.Name != "" {
-		query = query.Where("records.name LIKE ?", "%"+cfg.Name+"%")
-	}
-
-	if cfg.Version != "" {
-		query = query.Where("records.version = ?", cfg.Version)
-	}
-
-	// Handle skill filters.
-	if len(cfg.SkillIDs) > 0 || len(cfg.SkillNames) > 0 {
-		query = query.Joins("JOIN skills ON skills.record_cid = records.record_cid")
-
-		if len(cfg.SkillIDs) > 0 {
-			query = query.Where("skills.skill_id IN ?", cfg.SkillIDs)
-		}
-
-		if len(cfg.SkillNames) > 0 {
-			query = query.Where("skills.name IN ?", cfg.SkillNames)
-		}
-	}
-
-	// Handle locator filters.
-	if len(cfg.LocatorTypes) > 0 || len(cfg.LocatorURLs) > 0 {
-		query = query.Joins("JOIN locators ON locators.record_cid = records.record_cid")
-
-		if len(cfg.LocatorTypes) > 0 {
-			query = query.Where("locators.type IN ?", cfg.LocatorTypes)
-		}
-
-		if len(cfg.LocatorURLs) > 0 {
-			query = query.Where("locators.url IN ?", cfg.LocatorURLs)
-		}
-	}
-
-	// Handle extension filters.
-	if len(cfg.ExtensionNames) > 0 || len(cfg.ExtensionVersions) > 0 {
-		query = query.Joins("JOIN extensions ON extensions.record_cid = records.record_cid")
-
-		if len(cfg.ExtensionNames) > 0 {
-			query = query.Where("extensions.name IN ?", cfg.ExtensionNames)
-		}
-
-		if len(cfg.ExtensionVersions) > 0 {
-			query = query.Where("extensions.version IN ?", cfg.ExtensionVersions)
-		}
-	}
+	// Apply all filters.
+	query = d.handleFilterOptions(query, cfg)
 
 	// Execute the query to get records.
 	var dbRecords []Record
@@ -239,7 +195,7 @@ func (d *DB) GetRecords(opts ...types.FilterOption) ([]types.Record, error) { //
 
 // GetRecordCIDs retrieves only record CIDs based on the provided options.
 // This is optimized for cases where only CIDs are needed, avoiding expensive joins and preloads.
-func (d *DB) GetRecordCIDs(opts ...types.FilterOption) ([]string, error) { //nolint:cyclop
+func (d *DB) GetRecordCIDs(opts ...types.FilterOption) ([]string, error) {
 	// Create default configuration.
 	cfg := &types.RecordFilters{}
 
@@ -264,53 +220,8 @@ func (d *DB) GetRecordCIDs(opts ...types.FilterOption) ([]string, error) { //nol
 		query = query.Offset(cfg.Offset)
 	}
 
-	// Apply record-level filters.
-	if cfg.Name != "" {
-		query = query.Where("records.name LIKE ?", "%"+cfg.Name+"%")
-	}
-
-	if cfg.Version != "" {
-		query = query.Where("records.version = ?", cfg.Version)
-	}
-
-	// Handle skill filters.
-	if len(cfg.SkillIDs) > 0 || len(cfg.SkillNames) > 0 {
-		query = query.Joins("JOIN skills ON skills.record_cid = records.record_cid")
-
-		if len(cfg.SkillIDs) > 0 {
-			query = query.Where("skills.skill_id IN ?", cfg.SkillIDs)
-		}
-
-		if len(cfg.SkillNames) > 0 {
-			query = query.Where("skills.name IN ?", cfg.SkillNames)
-		}
-	}
-
-	// Handle locator filters.
-	if len(cfg.LocatorTypes) > 0 || len(cfg.LocatorURLs) > 0 {
-		query = query.Joins("JOIN locators ON locators.record_cid = records.record_cid")
-
-		if len(cfg.LocatorTypes) > 0 {
-			query = query.Where("locators.type IN ?", cfg.LocatorTypes)
-		}
-
-		if len(cfg.LocatorURLs) > 0 {
-			query = query.Where("locators.url IN ?", cfg.LocatorURLs)
-		}
-	}
-
-	// Handle extension filters.
-	if len(cfg.ExtensionNames) > 0 || len(cfg.ExtensionVersions) > 0 {
-		query = query.Joins("JOIN extensions ON extensions.record_cid = records.record_cid")
-
-		if len(cfg.ExtensionNames) > 0 {
-			query = query.Where("extensions.name IN ?", cfg.ExtensionNames)
-		}
-
-		if len(cfg.ExtensionVersions) > 0 {
-			query = query.Where("extensions.version IN ?", cfg.ExtensionVersions)
-		}
-	}
+	// Apply all filters.
+	query = d.handleFilterOptions(query, cfg)
 
 	// Execute the query to get only CIDs (no preloading needed).
 	var cids []string
@@ -341,4 +252,76 @@ func (d *DB) RemoveRecord(cid string) error {
 	logger.Debug("Removed record from search database", "cid", cid, "rows_affected", result.RowsAffected)
 
 	return nil
+}
+
+// handleFilterOptions applies the provided filters to the query.
+//
+//nolint:gocognit,cyclop,nestif
+func (d *DB) handleFilterOptions(query *gorm.DB, cfg *types.RecordFilters) *gorm.DB {
+	// Apply record-level filters with wildcard support.
+	if cfg.Name != "" {
+		condition, arg := utils.BuildSingleWildcardCondition("records.name", cfg.Name)
+		query = query.Where(condition, arg)
+	}
+
+	if cfg.Version != "" {
+		condition, arg := utils.BuildSingleWildcardCondition("records.version", cfg.Version)
+		query = query.Where(condition, arg)
+	}
+
+	// Handle skill filters with wildcard support.
+	if len(cfg.SkillIDs) > 0 || len(cfg.SkillNames) > 0 {
+		query = query.Joins("JOIN skills ON skills.record_cid = records.record_cid")
+
+		if len(cfg.SkillIDs) > 0 {
+			query = query.Where("skills.skill_id IN ?", cfg.SkillIDs)
+		}
+
+		if len(cfg.SkillNames) > 0 {
+			condition, args := utils.BuildWildcardCondition("skills.name", cfg.SkillNames)
+			if condition != "" {
+				query = query.Where(condition, args...)
+			}
+		}
+	}
+
+	// Handle locator filters with wildcard support.
+	if len(cfg.LocatorTypes) > 0 || len(cfg.LocatorURLs) > 0 {
+		query = query.Joins("JOIN locators ON locators.record_cid = records.record_cid")
+
+		if len(cfg.LocatorTypes) > 0 {
+			condition, args := utils.BuildWildcardCondition("locators.type", cfg.LocatorTypes)
+			if condition != "" {
+				query = query.Where(condition, args...)
+			}
+		}
+
+		if len(cfg.LocatorURLs) > 0 {
+			condition, args := utils.BuildWildcardCondition("locators.url", cfg.LocatorURLs)
+			if condition != "" {
+				query = query.Where(condition, args...)
+			}
+		}
+	}
+
+	// Handle extension filters with wildcard support.
+	if len(cfg.ExtensionNames) > 0 || len(cfg.ExtensionVersions) > 0 {
+		query = query.Joins("JOIN extensions ON extensions.record_cid = records.record_cid")
+
+		if len(cfg.ExtensionNames) > 0 {
+			condition, args := utils.BuildWildcardCondition("extensions.name", cfg.ExtensionNames)
+			if condition != "" {
+				query = query.Where(condition, args...)
+			}
+		}
+
+		if len(cfg.ExtensionVersions) > 0 {
+			condition, args := utils.BuildWildcardCondition("extensions.version", cfg.ExtensionVersions)
+			if condition != "" {
+				query = query.Where(condition, args...)
+			}
+		}
+	}
+
+	return query
 }
