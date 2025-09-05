@@ -5,14 +5,25 @@ package options
 
 import (
 	"github.com/agntcy/dir/hub/cmd/options"
+	"github.com/spf13/cobra"
 )
 
 type APIKeyDeleteOptions struct {
 	*options.HubOptions
+
+	JsonOutput bool
 }
 
-func NewAPIKeyDeleteOptions(hubOptions *options.HubOptions) *APIKeyDeleteOptions {
-	return &APIKeyDeleteOptions{
+func NewAPIKeyDeleteOptions(hubOptions *options.HubOptions, cmd *cobra.Command) *APIKeyDeleteOptions {
+	opt := &APIKeyDeleteOptions{
 		HubOptions: hubOptions,
 	}
+
+	opt.AddRegisterFn(func() error {
+		cmd.Flags().BoolVarP(&opt.JsonOutput, "json", "j", false, "Output in JSON format")
+
+		return nil
+	})
+
+	return opt
 }
