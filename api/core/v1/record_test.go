@@ -1,54 +1,47 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-package corev1
+package corev1_test
 
 import (
 	"testing"
 
-	objectsv1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v1"
-	objectsv3 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v3"
+	oasfv1alpha0 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/types/v1alpha0"
+	oasfv1alpha1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/types/v1alpha1"
+	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestRecord_GetCid(t *testing.T) {
 	tests := []struct {
 		name    string
-		record  *Record
+		record  *corev1.Record
 		want    string
 		wantErr bool
 	}{
 		{
 			name: "v0.3.1 agent record",
-			record: &Record{
-				Data: &Record_V1{
-					V1: &objectsv1.Agent{
-						Name:          "test-agent",
-						SchemaVersion: "v0.3.1",
-						Description:   "A test agent",
-					},
-				},
-			},
+			record: corev1.New(&oasfv1alpha0.Record{
+				Name:          "test-agent",
+				SchemaVersion: "v0.3.1",
+				Description:   "A test agent",
+			}),
 			wantErr: false,
 		},
 		{
 			name: "v0.5.0 record",
-			record: &Record{
-				Data: &Record_V3{
-					V3: &objectsv3.Record{
-						Name:          "test-agent-v2",
-						SchemaVersion: "v0.5.0",
-						Description:   "A test agent in v0.5.0 record",
-						Version:       "1.0.0",
-						Extensions: []*objectsv3.Extension{
-							{
-								Name:    "test-extension",
-								Version: "1.0.0",
-							},
-						},
+			record: corev1.New(&oasfv1alpha1.Record{
+				Name:          "test-agent-v2",
+				SchemaVersion: "v0.5.0",
+				Description:   "A test agent in v0.5.0 record",
+				Version:       "1.0.0",
+				Modules: []*oasfv1alpha1.Module{
+					{
+						Name: "test-extension",
 					},
 				},
-			},
+			}),
 			wantErr: false,
 		},
 		{
@@ -58,7 +51,7 @@ func TestRecord_GetCid(t *testing.T) {
 		},
 		{
 			name:    "empty record",
-			record:  &Record{},
+			record:  &corev1.Record{},
 			wantErr: true, // Empty record should fail - no OASF data to marshal
 		},
 	}
@@ -87,27 +80,17 @@ func TestRecord_GetCid(t *testing.T) {
 
 func TestRecord_GetCid_Consistency(t *testing.T) {
 	// Create two identical v0.3.1 records.
-	agent := &objectsv1.Agent{
+	record1 := corev1.New(&oasfv1alpha1.Record{
 		Name:          "test-agent",
-		SchemaVersion: "v0.3.1",
+		SchemaVersion: "v0.7.0",
 		Description:   "A test agent",
-	}
+	})
 
-	record1 := &Record{
-		Data: &Record_V1{
-			V1: agent,
-		},
-	}
-
-	record2 := &Record{
-		Data: &Record_V1{
-			V1: &objectsv1.Agent{
-				Name:          "test-agent",
-				SchemaVersion: "v0.3.1",
-				Description:   "A test agent",
-			},
-		},
-	}
+	record2 := corev1.New(&oasfv1alpha1.Record{
+		Name:          "test-agent",
+		SchemaVersion: "v0.7.0",
+		Description:   "A test agent",
+	})
 
 	// Both records should have the same CID.
 	cid1 := record1.GetCid()
@@ -116,123 +99,206 @@ func TestRecord_GetCid_Consistency(t *testing.T) {
 	assert.Equal(t, cid1, cid2, "Identical v0.3.1 records should have identical CIDs")
 }
 
-func TestRecord_GetCid_V0_5_0_Consistency(t *testing.T) {
-	// Create two identical v0.5.0 records.
-	v0_5_0Record1 := &Record{
-		Data: &Record_V3{
-			V3: &objectsv3.Record{
-				Name:          "test-agent-v2",
-				SchemaVersion: "v0.5.0",
-				Description:   "A test agent in v0.5.0 record",
-				Version:       "1.0.0",
-				Extensions: []*objectsv3.Extension{
-					{
-						Name:    "test-extension",
-						Version: "1.0.0",
-					},
-				},
-			},
-		},
-	}
+func TestRecord_GetCid_CrossVersion_Difference(t *testing.T) {
+	// Create two different records
+	record1 := corev1.New(&oasfv1alpha0.Record{
+		Name:          "test-agent",
+		SchemaVersion: "v0.3.1",
+		Description:   "A test agent",
+	})
 
-	v0_5_0Record2 := &Record{
-		Data: &Record_V3{
-			V3: &objectsv3.Record{
-				Name:          "test-agent-v2",
-				SchemaVersion: "v0.5.0",
-				Description:   "A test agent in v0.5.0 record",
-				Version:       "1.0.0",
-				Extensions: []*objectsv3.Extension{
-					{
-						Name:    "test-extension",
-						Version: "1.0.0",
-					},
-				},
-			},
-		},
-	}
+	record2 := corev1.New(&oasfv1alpha1.Record{
+		Name:          "test-agent",
+		SchemaVersion: "v0.7.0",
+		Description:   "A test agent",
+	})
 
 	// Both records should have the same CID.
-	cid1 := v0_5_0Record1.GetCid()
-	cid2 := v0_5_0Record2.GetCid()
-
-	assert.Equal(t, cid1, cid2, "Identical v0.5.0 records should have identical CIDs")
-}
-
-func TestRecord_GetCid_CrossVersion_Difference(t *testing.T) {
-	// Create similar but different version records - they should have different CIDs.
-	v0_3_1Record := &Record{
-		Data: &Record_V1{
-			V1: &objectsv1.Agent{
-				Name:          "test-agent",
-				SchemaVersion: "v0.3.1",
-				Description:   "A test agent",
-			},
-		},
-	}
-
-	v0_5_0Record := &Record{
-		Data: &Record_V3{
-			V3: &objectsv3.Record{
-				Name:          "test-agent",
-				SchemaVersion: "v0.5.0",
-				Description:   "A test agent",
-				Version:       "1.0.0",
-			},
-		},
-	}
-
-	cid1 := v0_3_1Record.GetCid()
-	cid2 := v0_5_0Record.GetCid()
+	cid1 := record1.GetCid()
+	cid2 := record2.GetCid()
 
 	assert.NotEqual(t, cid1, cid2, "Different record versions should have different CIDs")
 }
 
-func TestRecord_MustGetCid(t *testing.T) {
-	record := &Record{
-		Data: &Record_V1{
-			V1: &objectsv1.Agent{
-				Name:          "test-agent",
-				SchemaVersion: "v0.3.1",
-				Description:   "A test agent",
-			},
-		},
-	}
-
-	// MustGetCid should not panic for valid record.
-	assert.NotPanics(t, func() {
-		cid := record.MustGetCid()
-		assert.NotEmpty(t, cid)
-	})
-
-	// Test with v0.5.0 record.
-	v0_5_0Record := &Record{
-		Data: &Record_V3{
-			V3: &objectsv3.Record{
-				Name:          "test-agent-v2",
-				SchemaVersion: "v0.5.0",
-				Description:   "A test agent in v0.5.0 record",
+func TestRecord_Validate(t *testing.T) {
+	tests := []struct {
+		name      string
+		record    *corev1.Record
+		wantValid bool
+	}{
+		{
+			name: "valid v0.7.0 record",
+			record: corev1.New(&oasfv1alpha1.Record{
+				Name:          "valid-agent-v2",
+				SchemaVersion: "v0.7.0",
+				Description:   "A valid agent record",
 				Version:       "1.0.0",
+				CreatedAt:     "2024-01-01T00:00:00Z",
+				Authors: []string{
+					"Jane Doe <jane.doe@example.com>",
+				},
+				Locators: []*oasfv1alpha1.Locator{
+					{
+						Type: "helm_chart",
+						Url:  "https://example.com/helm-chart.tgz",
+					},
+				},
+				Skills: []*oasfv1alpha1.Skill{
+					{
+						Name: "natural_language_processing/natural_language_understanding",
+					},
+				},
+				Modules: []*oasfv1alpha1.Module{
+					{
+						Name: "test-extension",
+					},
+				},
+			}),
+			wantValid: true,
+		},
+		{
+			name: "invalid v0.7.0 record (missing required fields)",
+			record: corev1.New(&oasfv1alpha1.Record{
+				Name:          "invalid-agent-v2",
+				SchemaVersion: "v0.5.0",
+				Description:   "An invalid agent record in v0.5.0 format",
+				Version:       "1.0.0",
+			}),
+			wantValid: false,
+		},
+		{
+			name:      "nil record",
+			record:    nil,
+			wantValid: false,
+		},
+		{
+			name:      "empty record",
+			record:    &corev1.Record{},
+			wantValid: false,
+		},
+		{
+			name: "record with invalid generic data",
+			record: &corev1.Record{
+				Data: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"invalid_field": {
+							Kind: &structpb.Value_StringValue{StringValue: "some value"},
+						},
+					},
+				},
 			},
+			wantValid: false,
 		},
 	}
 
-	assert.NotPanics(t, func() {
-		cid := v0_5_0Record.MustGetCid()
-		assert.NotEmpty(t, cid)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			valid, errors, err := tt.record.Validate()
+			if err != nil {
+				if tt.wantValid {
+					t.Errorf("Validate() unexpected error: %v", err)
+				}
 
-	// MustGetCid should panic for nil record.
-	var nilRecord *Record
+				return
+			}
 
-	assert.Panics(t, func() {
-		nilRecord.MustGetCid()
-	})
+			if valid != tt.wantValid {
+				t.Errorf("Validate() got valid = %v, errors = %v, want %v", valid, errors, tt.wantValid)
+			}
 
-	// MustGetCid should panic for empty record (no OASF data).
-	emptyRecord := &Record{}
+			if !valid && len(errors) == 0 {
+				t.Errorf("Validate() expected errors for invalid record, got none")
+			}
+		})
+	}
+}
 
-	assert.Panics(t, func() {
-		emptyRecord.MustGetCid()
-	})
+func TestRecord_Decode(t *testing.T) {
+	tests := []struct {
+		name     string
+		record   *corev1.Record
+		wantResp interface{}
+		wantFail bool
+	}{
+		{
+			name: "valid v0.3.1 record",
+			record: corev1.New(&oasfv1alpha0.Record{
+				Name:          "valid-agent-v2",
+				SchemaVersion: "v0.3.1",
+				Description:   "A valid agent record",
+				Version:       "1.0.0",
+				CreatedAt:     "2024-01-01T00:00:00Z",
+			}),
+			wantResp: &oasfv1alpha0.Record{
+				Name:          "valid-agent-v2",
+				SchemaVersion: "v0.3.1",
+				Description:   "A valid agent record",
+				Version:       "1.0.0",
+				CreatedAt:     "2024-01-01T00:00:00Z",
+			},
+		},
+		{
+			name: "valid v0.7.0 record",
+			record: corev1.New(&oasfv1alpha1.Record{
+				Name:          "valid-agent-v2",
+				SchemaVersion: "v0.7.0",
+				Description:   "A valid agent record",
+				Version:       "1.0.0",
+				CreatedAt:     "2024-01-01T00:00:00Z",
+			}),
+			wantResp: &oasfv1alpha1.Record{
+				Name:          "valid-agent-v2",
+				SchemaVersion: "v0.7.0",
+				Description:   "A valid agent record",
+				Version:       "1.0.0",
+				CreatedAt:     "2024-01-01T00:00:00Z",
+			},
+		},
+		{
+			name:     "nil record",
+			record:   nil,
+			wantFail: true,
+		},
+		{
+			name:     "empty record",
+			record:   &corev1.Record{},
+			wantFail: true,
+		},
+		{
+			name: "record with invalid generic data",
+			record: &corev1.Record{
+				Data: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"invalid_field": {
+							Kind: &structpb.Value_StringValue{StringValue: "some value"},
+						},
+					},
+				},
+			},
+			wantFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.record.Decode()
+			if err != nil {
+				if !tt.wantFail {
+					t.Errorf("Decode() unexpected error: %v", err)
+				}
+
+				return
+			}
+
+			if got == nil {
+				t.Errorf("Decode() got nil record, want %v", tt.wantResp)
+
+				return
+			}
+
+			if !assert.EqualValues(t, tt.wantResp, got.GetRecord()) {
+				t.Errorf("Decode() got %v, want %v", got, tt.wantResp)
+			}
+		})
+	}
 }

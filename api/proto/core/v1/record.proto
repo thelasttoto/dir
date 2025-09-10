@@ -5,9 +5,7 @@ syntax = "proto3";
 
 package core.v1;
 
-import "objects/v1/agent.proto";
-import "objects/v2/agent_record.proto";
-import "objects/v3/record.proto";
+import "google/protobuf/struct.proto";
 
 // Defines a reference or a globally unique content identifier of a record.
 message RecordRef {
@@ -32,13 +30,12 @@ message RecordMeta {
   string created_at = 4;
 }
 
-// Record unifies different versions of records into a single message.
-// It allows for backward compatibility and easier handling of different
-// record versions in the same service or application.
+// Record is a generic object that encapsulates data of different Record types.
+//
+// Supported schemas:
+//
+// v0.3.1: https://schema.oasf.outshift.com/0.3.1/objects/agent
+// v0.7.0: https://schema.oasf.outshift.com/0.7.0/objects/record
 message Record {
-  oneof data {
-    objects.v1.Agent v1 = 1;
-    objects.v2.AgentRecord v2 = 2;
-    objects.v3.Record v3 = 3;
-  }
+  google.protobuf.Struct data = 1;
 }

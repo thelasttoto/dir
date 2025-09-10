@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	objectsv1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v1"
+	typesv1alpha0 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/types/v1alpha0"
 	corev1 "github.com/agntcy/dir/api/core/v1"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
@@ -19,19 +19,15 @@ import (
 // A discovers it retrieves the key metadata from B.
 func TestHandler(t *testing.T) {
 	// Test data
-	testRecord := &corev1.Record{
-		Data: &corev1.Record_V1{
-			V1: &objectsv1.Agent{
-				Name: "test-handler-agent",
-				Skills: []*objectsv1.Skill{
-					{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-				},
-				Locators: []*objectsv1.Locator{
-					{Type: "type1", Url: "url1"},
-				},
-			},
+	testRecord := corev1.New(&typesv1alpha0.Record{
+		Name: "test-handler-agent",
+		Skills: []*typesv1alpha0.Skill{
+			{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
 		},
-	}
+		Locators: []*typesv1alpha0.Locator{
+			{Type: "type1", Url: "url1"},
+		},
+	})
 	testRef := &corev1.RecordRef{Cid: testRecord.GetCid()}
 
 	// create demo network

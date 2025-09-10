@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	objectsv1 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/objects/v1"
+	typesv1alpha0 "buf.build/gen/go/agntcy/oasf/protocolbuffers/go/types/v1alpha0"
 	corev1 "github.com/agntcy/dir/api/core/v1"
 	routingv1 "github.com/agntcy/dir/api/routing/v1"
 	"github.com/agntcy/dir/server/datastore"
@@ -84,27 +84,21 @@ func (m *mockStore) Delete(_ context.Context, ref *corev1.RecordRef) error {
 
 func TestPublishList_ValidSingleSkillQuery(t *testing.T) {
 	var (
-		testRecord = &corev1.Record{
-			Data: &corev1.Record_V1{
-				V1: &objectsv1.Agent{
-					Name: "test-agent-1",
-					Skills: []*objectsv1.Skill{
-						{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-					},
-				},
+		testRecord = corev1.New(&typesv1alpha0.Record{
+			Name:          "test-agent-1",
+			SchemaVersion: "v0.3.1",
+			Skills: []*typesv1alpha0.Skill{
+				{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
 			},
-		}
-		testRecord2 = &corev1.Record{
-			Data: &corev1.Record_V1{
-				V1: &objectsv1.Agent{
-					Name: "test-agent-2",
-					Skills: []*objectsv1.Skill{
-						{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-						{CategoryName: toPtr("category2"), ClassName: toPtr("class2")},
-					},
-				},
+		})
+		testRecord2 = corev1.New(&typesv1alpha0.Record{
+			Name:          "test-agent-2",
+			SchemaVersion: "v0.3.1",
+			Skills: []*typesv1alpha0.Skill{
+				{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
+				{CategoryName: toPtr("category2"), ClassName: toPtr("class2")},
 			},
-		}
+		})
 
 		testRef  = &corev1.RecordRef{Cid: testRecord.GetCid()}
 		testRef2 = &corev1.RecordRef{Cid: testRecord2.GetCid()}
@@ -220,18 +214,14 @@ func TestPublishList_ValidSingleSkillQuery(t *testing.T) {
 func TestPublishList_ValidMultiSkillQuery(t *testing.T) {
 	// Test data
 	var (
-		testRecord = &corev1.Record{
-			Data: &corev1.Record_V1{
-				V1: &objectsv1.Agent{
-					Name: "test-agent-multi",
-					Skills: []*objectsv1.Skill{
-						{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-						{CategoryName: toPtr("category2"), ClassName: toPtr("class2")},
-					},
-				},
+		testRecord = corev1.New(&typesv1alpha0.Record{
+			Name:          "test-agent-multi",
+			SchemaVersion: "v0.3.1",
+			Skills: []*typesv1alpha0.Skill{
+				{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
+				{CategoryName: toPtr("category2"), ClassName: toPtr("class2")},
 			},
-		}
-
+		})
 		testRef = &corev1.RecordRef{Cid: testRecord.GetCid()}
 	)
 
@@ -324,16 +314,13 @@ func Benchmark_RouteLocal(b *testing.B) {
 	badgerRouter := newLocal(store, badgerDatastore, testPeerID)
 	inMemoryRouter := newLocal(store, inMemoryDatastore, testPeerID)
 
-	record := &corev1.Record{
-		Data: &corev1.Record_V1{
-			V1: &objectsv1.Agent{
-				Name: "bench-agent",
-				Skills: []*objectsv1.Skill{
-					{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
-				},
-			},
+	record := corev1.New(&typesv1alpha0.Record{
+		Name:          "bench-agent",
+		SchemaVersion: "v0.3.1",
+		Skills: []*typesv1alpha0.Skill{
+			{CategoryName: toPtr("category1"), ClassName: toPtr("class1")},
 		},
-	}
+	})
 	ref := &corev1.RecordRef{Cid: record.GetCid()}
 
 	_, err := store.Push(b.Context(), record)

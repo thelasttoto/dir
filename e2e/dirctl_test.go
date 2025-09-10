@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a local single no
 		{
 			name:              "V1_Agent_OASF_v0.3.1",
 			fileName:          "record_v1_test.json",
-			jsonData:          expectedRecordV1JSON,
+			jsonData:          expectedRecordV1Alpha0JSON,
 			expectedAgentName: "directory.agntcy.org/cisco/marketing-strategy-v1",
 			expectedSkillIDs:  []string{"10201", "10702"},
 			expectedSkillNames: []string{
@@ -59,22 +59,9 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a local single no
 			expectedExtension: "schema.oasf.agntcy.org/features/runtime/framework:v0.0.0",
 		},
 		{
-			name:              "V2_AgentRecord_OASF_v0.4.0",
-			fileName:          "record_v2_test.json",
-			jsonData:          expectedRecordV2JSON,
-			expectedAgentName: "directory.agntcy.org/cisco/marketing-strategy-v2",
-			expectedSkillIDs:  []string{"10201", "10702"},
-			expectedSkillNames: []string{
-				"Natural Language Processing/Text Completion",
-				"Natural Language Processing/Problem Solving",
-			},
-			expectedLocator:   "docker-image:https://ghcr.io/agntcy/marketing-strategy",
-			expectedExtension: "schema.oasf.agntcy.org/features/runtime/framework:v0.0.0",
-		},
-		{
-			name:              "V3_Record_OASF_v0.5.0",
+			name:              "V3_Record_OASF_v0.7.0",
 			fileName:          "record_v3_test.json",
-			jsonData:          expectedRecordV3JSON,
+			jsonData:          expectedRecordV1Alpha1JSON,
 			expectedAgentName: "directory.agntcy.org/cisco/marketing-strategy-v3",
 			expectedSkillIDs:  []string{"10201", "10702"},
 			expectedSkillNames: []string{
@@ -82,7 +69,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a local single no
 				"Natural Language Processing/Problem Solving",
 			},
 			expectedLocator:   "docker-image:https://ghcr.io/agntcy/marketing-strategy",
-			expectedExtension: "schema.oasf.agntcy.org/features/runtime/framework:v0.0.0",
+			expectedExtension: "runtime/framework",
 		},
 	}
 
@@ -123,7 +110,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests using a local single no
 					"JSON comparison should not error for %s", version.name)
 				gomega.Expect(equal).To(gomega.BeTrue(),
 					"PUSH/PULL MISMATCH for %s: Original and pulled record should be identical. "+
-						"This indicates data loss during push/pull cycle - possibly the V3 skills issue!", version.name)
+						"This indicates data loss during push/pull cycle - possibly the skills issue!", version.name)
 			})
 
 			// Step 4: Verify duplicate push returns same CID (depends on push)

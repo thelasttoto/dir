@@ -4,7 +4,6 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
 	"strings"
 	"time"
@@ -76,27 +75,16 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 	}{
 		{
 			name:     "V1_Agent_OASF_v0.3.1",
-			jsonData: expectedRecordV1JSON,
+			jsonData: expectedRecordV1Alpha0JSON,
 			expectedSkillLabels: []string{
 				"/skills/Natural Language Processing/Text Completion",
 				"/skills/Natural Language Processing/Problem Solving",
 			},
-			expectedDomainLabel:  "/domains/research",
 			expectedFeatureLabel: "/features/runtime/framework",
 		},
 		{
-			name:     "V2_AgentRecord_OASF_v0.4.0",
-			jsonData: expectedRecordV2JSON,
-			expectedSkillLabels: []string{
-				"/skills/Natural Language Processing/Text Completion",
-				"/skills/Natural Language Processing/Problem Solving",
-			},
-			expectedDomainLabel:  "/domains/research",
-			expectedFeatureLabel: "/features/runtime/framework",
-		},
-		{
-			name:     "V3_Record_OASF_v0.5.0",
-			jsonData: expectedRecordV3JSON,
+			name:     "V3_Record_OASF_v0.7.0",
+			jsonData: expectedRecordV1Alpha1JSON,
 			expectedSkillLabels: []string{
 				"/skills/Natural Language Processing/Text Completion",
 				"/skills/Natural Language Processing/Problem Solving",
@@ -116,11 +104,11 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 
 			// Load the record once per version context (inline initialization)
 			var err error
-			record, err = corev1.LoadOASFFromReader(bytes.NewReader(version.jsonData))
+			record, err = corev1.UnmarshalRecord(version.jsonData)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Use canonical marshaling for CID validation
-			canonicalData, err = record.MarshalOASF()
+			canonicalData, err = record.Marshal()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Step 1: Push
@@ -140,7 +128,7 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				// Get canonical data from pulled record for comparison
-				pulledCanonicalData, err := pulledRecord.MarshalOASF()
+				pulledCanonicalData, err := pulledRecord.Marshal()
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				// Compare pushed and pulled records using canonical data
@@ -210,9 +198,20 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 			ginkgo.It("should list published record by feature and domain labels", func() {
 				// ✅ Domain and feature queries are now supported in RecordQuery API!
 				// Test domain query
-				domainQuery := &routingv1.RecordQuery{
-					Type:  routingv1.RecordQueryType_RECORD_QUERY_TYPE_DOMAIN,
-					Value: "research", // From record_v3.json extension
+				if version.expectedDomainLabel != "" {
+					domainQuery := &routingv1.RecordQuery{
+						Type:  routingv1.RecordQueryType_RECORD_QUERY_TYPE_DOMAIN,
+						Value: "research", // From record_v3.json extension
+					}
+					domainItemsChan, err := c.List(ctx, &routingv1.ListRequest{
+						Queries: []*routingv1.RecordQuery{domainQuery},
+						Limit:   utils.Ptr[uint32](10),
+					})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					domainResults := utils.CollectListItems(domainItemsChan)
+					gomega.Expect(domainResults).ToNot(gomega.BeEmpty(), "Should find record with domain query")
+					gomega.Expect(domainResults[0].GetRecordRef().GetCid()).To(gomega.Equal(recordRef.GetCid()))
 				}
 
 				// Test feature query
@@ -220,19 +219,6 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 					Type:  routingv1.RecordQueryType_RECORD_QUERY_TYPE_FEATURE,
 					Value: "runtime/language", // From record_v3.json extension
 				}
-
-				// Test with domain query
-				domainItemsChan, err := c.List(ctx, &routingv1.ListRequest{
-					Queries: []*routingv1.RecordQuery{domainQuery},
-					Limit:   utils.Ptr[uint32](10),
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				domainResults := utils.CollectListItems(domainItemsChan)
-				gomega.Expect(domainResults).ToNot(gomega.BeEmpty(), "Should find record with domain query")
-				gomega.Expect(domainResults[0].GetRecordRef().GetCid()).To(gomega.Equal(recordRef.GetCid()))
-
-				// Test with feature query
 				featureItemsChan, err := c.List(ctx, &routingv1.ListRequest{
 					Queries: []*routingv1.RecordQuery{featureQuery},
 					Limit:   utils.Ptr[uint32](10),
@@ -243,7 +229,7 @@ var _ = ginkgo.Describe("Running client end-to-end tests using a local single no
 				gomega.Expect(featureResults).ToNot(gomega.BeEmpty(), "Should find record with feature query")
 				gomega.Expect(featureResults[0].GetRecordRef().GetCid()).To(gomega.Equal(recordRef.GetCid()))
 
-				ginkgo.GinkgoWriter.Printf("✅ SUCCESS: Domain and feature queries working correctly")
+				ginkgo.GinkgoWriter.Printf("✅ SUCCESS: Queries working correctly")
 			})
 
 			// Step 7: Search routing for remote records (depends on publish)

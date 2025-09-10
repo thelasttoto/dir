@@ -15,6 +15,8 @@ import (
 
 var labelLogger = logging.Logger("labels")
 
+const featuresSchemaPrefix = "schema.oasf.agntcy.org/features/"
+
 // GetLabels extracts all labels from a record across all supported namespaces.
 // This is a pure function that can be used by both local and remote routing operations.
 //
@@ -29,9 +31,9 @@ func GetLabels(record *corev1.Record) []Label {
 	// Use adapter pattern to get version-agnostic access to record data
 	adapter := adapters.NewRecordAdapter(record)
 
-	recordData := adapter.GetRecordData()
-	if recordData == nil {
-		labelLogger.Error("failed to get record data")
+	recordData, err := adapter.GetRecordData()
+	if err != nil {
+		labelLogger.Error("failed to get record data", "err", err)
 
 		return nil
 	}
@@ -44,22 +46,17 @@ func GetLabels(record *corev1.Record) []Label {
 		labels = append(labels, skillLabel)
 	}
 
-	// Extract record domains from extensions
-	for _, ext := range recordData.GetExtensions() {
-		if strings.HasPrefix(ext.GetName(), DomainSchemaPrefix) {
-			domain := ext.GetName()[len(DomainSchemaPrefix):]
-			domainLabel := Label(LabelTypeDomain.Prefix() + domain)
-			labels = append(labels, domainLabel)
-		}
+	// Extract record domains
+	for _, domain := range recordData.GetDomains() {
+		domainLabel := Label(LabelTypeDomain.Prefix() + domain.GetName())
+		labels = append(labels, domainLabel)
 	}
 
 	// Extract record features from extensions
 	for _, ext := range recordData.GetExtensions() {
-		if strings.HasPrefix(ext.GetName(), FeaturesSchemaPrefix) {
-			feature := ext.GetName()[len(FeaturesSchemaPrefix):]
-			featureLabel := Label(LabelTypeFeature.Prefix() + feature)
-			labels = append(labels, featureLabel)
-		}
+		name := strings.TrimPrefix(ext.GetName(), featuresSchemaPrefix)
+		featureLabel := Label(LabelTypeFeature.Prefix() + name)
+		labels = append(labels, featureLabel)
 	}
 
 	// Extract record locators
