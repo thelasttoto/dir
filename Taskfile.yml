@@ -47,6 +47,7 @@ vars:
   COSIGN_BIN: '{{ .BIN_DIR }}/cosign-{{.COSIGN_VERSION}}'
   HUB_API_VERSION: 'main'
   HUB_REPO_URL: 'https://github.com/cisco-eti/phoenix-saas-be.git'
+  ZOT_VERSION: '2.1.8'
 
 tasks:
   ##
@@ -371,7 +372,7 @@ tasks:
     desc: Start local OCI registry server for storage
     internal: true
     vars:
-      IMAGE: ghcr.io/project-zot/zot-linux-{{ARCH}}:v2.1.1
+      IMAGE: ghcr.io/project-zot/zot-linux-{{ARCH}}:{{.ZOT_VERSION}}
     deps:
       - task: server:store:pull
         vars:
@@ -649,6 +650,7 @@ tasks:
           --set apiserver.privKey="$(cat /tmp/node.privkey)" \
           --set apiserver.config.routing.key_path="/etc/agntcy/dir/node.privkey" \
           --set apiserver.config.routing.listen_address="/ip4/0.0.0.0/tcp/8999" \
+          --set apiserver.config.routing.directory_api_address="agntcy-dir-apiserver.bootstrap.svc.cluster.local:8888" \
           --set apiserver.config.store.oci.registry_address="agntcy-dir-zot.bootstrap.svc.cluster.local:5000" \
           --set-json 'apiserver.extraVolumes=[{"name":"zot-config-storage","hostPath":{"path":"/opt/zot-config-bootstrap","type":"DirectoryOrCreate"}}]' \
           --set-json 'apiserver.zot.extraVolumes=[{"name":"zot-config-storage","hostPath":{"path":"/opt/zot-config-bootstrap","type":"DirectoryOrCreate"}}]' \
@@ -691,6 +693,7 @@ tasks:
             {{ if .PUBLICATION_SCHEDULER_INTERVAL }}--set apiserver.config.publication.scheduler_interval="{{ .PUBLICATION_SCHEDULER_INTERVAL }}"{{ end }} \
             --set apiserver.config.store.oci.registry_address="agntcy-dir-zot.{{ .ITEM.PEER }}.svc.cluster.local:5000" \
             --set apiserver.config.routing.bootstrap_peers[0]="/dns4/agntcy-dir-apiserver-routing.bootstrap.svc.cluster.local/tcp/8999/p2p/${BOOTSTRAP_PEER_ID}" \
+            --set apiserver.config.routing.directory_api_address="agntcy-dir-apiserver.{{ .ITEM.PEER }}.svc.cluster.local:8888" \
             --set-json 'apiserver.extraVolumes=[{"name":"zot-config-storage","hostPath":{"path":"/opt/zot-config-{{ .ITEM.PEER }}","type":"DirectoryOrCreate"}}]' \
             --set-json 'apiserver.zot.extraVolumes=[{"name":"zot-config-storage","hostPath":{"path":"/opt/zot-config-{{ .ITEM.PEER }}","type":"DirectoryOrCreate"}}]' \
             --namespace "{{ .ITEM.PEER }}" \

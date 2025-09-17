@@ -4,9 +4,12 @@
 package sync
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
+	routingv1 "github.com/agntcy/dir/api/routing/v1"
 	storev1 "github.com/agntcy/dir/api/store/v1"
 	"github.com/agntcy/dir/cli/presenter"
 	ctxUtils "github.com/agntcy/dir/cli/util/context"
@@ -27,12 +30,32 @@ var createCmd = &cobra.Command{
 	Long: `Create initiates a new synchronization operation from a remote Directory node.
 The operation is asynchronous and returns a sync ID for tracking progress.
 
-Examples:
+When --stdin flag is used, the command parses JSON routing search output from stdin
+and creates sync operations for each provider found in the search results.
+
+Usage examples:
+
+1. Create sync with remote peer:
   dir sync create https://directory.example.com
-  dir sync create http://localhost:8080`,
-	Args: cobra.ExactArgs(1),
+
+2. Create sync with specific CIDs:
+  dir sync create http://localhost:8080 --cids cid1,cid2,cid3
+
+3. Create sync from routing search output:
+  dirctl routing search --skill "AI" --json | dirctl sync create --stdin`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if opts.Stdin {
+			return cobra.MaximumNArgs(0)(cmd, args)
+		}
+
+		return cobra.ExactArgs(1)(cmd, args)
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runCreateSync(cmd, args[0])
+		if opts.Stdin {
+			return runCreateSyncFromStdin(cmd)
+		}
+
+		return runCreateSync(cmd, args[0], opts.CIDs)
 	},
 }
 
@@ -82,7 +105,7 @@ func init() {
 	Command.AddCommand(deleteCmd)
 }
 
-func runCreateSync(cmd *cobra.Command, remoteURL string) error {
+func runCreateSync(cmd *cobra.Command, remoteURL string, cids []string) error {
 	// Validate remote URL
 	if remoteURL == "" {
 		return errors.New("remote URL is required")
@@ -93,7 +116,7 @@ func runCreateSync(cmd *cobra.Command, remoteURL string) error {
 		return errors.New("failed to get client from context")
 	}
 
-	syncID, err := client.CreateSync(cmd.Context(), remoteURL)
+	syncID, err := client.CreateSync(cmd.Context(), remoteURL, cids)
 	if err != nil {
 		return fmt.Errorf("failed to create sync: %w", err)
 	}
@@ -178,6 +201,117 @@ func runDeleteSync(cmd *cobra.Command, syncID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete sync: %w", err)
 	}
+
+	return nil
+}
+
+func runCreateSyncFromStdin(cmd *cobra.Command) error {
+	// Parse the search output from stdin
+	results, err := parseSearchOutput(cmd.InOrStdin())
+	if err != nil {
+		return fmt.Errorf("failed to parse search output: %w", err)
+	}
+
+	if len(results) == 0 {
+		presenter.Printf(cmd, "No search results found in stdin\n")
+
+		return nil
+	}
+
+	// Group results by API address (one sync per peer)
+	peerResults := groupResultsByAPIAddress(results)
+
+	// Create sync operations for each peer
+	return createSyncOperations(cmd, peerResults)
+}
+
+func parseSearchOutput(input io.Reader) ([]*routingv1.SearchResponse, error) {
+	// Read JSON input from routing search --json
+	inputBytes, err := io.ReadAll(input)
+	if err != nil {
+		return nil, fmt.Errorf("error reading input: %w", err)
+	}
+
+	var searchResponses []*routingv1.SearchResponse
+
+	err = json.Unmarshal(inputBytes, &searchResponses)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return searchResponses, nil
+}
+
+// PeerSyncInfo holds sync information for a peer (grouped by API address).
+type PeerSyncInfo struct {
+	APIAddress string
+	CIDs       []string
+}
+
+func groupResultsByAPIAddress(results []*routingv1.SearchResponse) map[string]PeerSyncInfo {
+	peerResults := make(map[string]PeerSyncInfo)
+
+	for _, result := range results {
+		// Get the first API address if available
+		var apiAddress string
+		if result.GetPeer() != nil && len(result.GetPeer().GetAddrs()) > 0 {
+			apiAddress = result.GetPeer().GetAddrs()[0]
+		}
+
+		// Skip results without API address
+		if apiAddress == "" {
+			continue
+		}
+
+		cid := result.GetRecordRef().GetCid()
+
+		if existing, exists := peerResults[apiAddress]; exists {
+			existing.CIDs = append(existing.CIDs, cid)
+			peerResults[apiAddress] = existing
+		} else {
+			peerResults[apiAddress] = PeerSyncInfo{
+				APIAddress: apiAddress,
+				CIDs:       []string{cid},
+			}
+		}
+	}
+
+	return peerResults
+}
+
+func createSyncOperations(cmd *cobra.Command, peerResults map[string]PeerSyncInfo) error {
+	client, ok := ctxUtils.GetClientFromContext(cmd.Context())
+	if !ok {
+		return errors.New("failed to get client from context")
+	}
+
+	totalSyncs := 0
+	totalCIDs := 0
+
+	for apiAddress, syncInfo := range peerResults {
+		if syncInfo.APIAddress == "" {
+			presenter.Printf(cmd, "WARNING: No API address found for peer\n")
+			presenter.Printf(cmd, "Skipping sync for this peer\n")
+
+			continue
+		}
+
+		// Create sync operation
+		syncID, err := client.CreateSync(cmd.Context(), syncInfo.APIAddress, syncInfo.CIDs)
+		if err != nil {
+			presenter.Printf(cmd, "ERROR: Failed to create sync for peer %s: %v\n", apiAddress, err)
+
+			continue
+		}
+
+		presenter.Printf(cmd, "Sync created with ID: %s\n", syncID)
+		presenter.Printf(cmd, "\n")
+
+		totalSyncs++
+		totalCIDs += len(syncInfo.CIDs)
+	}
+
+	presenter.Printf(cmd, "Summary: Created %d sync operation(s) for %d CID(s)\n", totalSyncs, totalCIDs)
 
 	return nil
 }

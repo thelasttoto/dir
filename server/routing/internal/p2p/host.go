@@ -10,10 +10,43 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
+const (
+	DirProtocol     = "dir"
+	DirProtocolCode = 65535
+)
+
+// Add dir protocol to the host.
+//
+//nolint:mnd
+func init() {
+	err := ma.AddProtocol(ma.Protocol{
+		Name:  DirProtocol,
+		Code:  DirProtocolCode,
+		VCode: ma.CodeToVarint(DirProtocolCode),
+		Size:  ma.LengthPrefixedVarSize,
+		Transcoder: ma.NewTranscoderFromFunctions(
+			// String to bytes encoder
+			func(s string) ([]byte, error) {
+				return []byte(s), nil
+			},
+			// Bytes to string decoder
+			func(b []byte) (string, error) {
+				return string(b), nil
+			},
+			// Validator (optional)
+			nil,
+		),
+	})
+	if err != nil {
+		panic(fmt.Errorf("failed to add dir protocol: %w", err))
+	}
+}
+
 // newHost creates a new host libp2p host.
-func newHost(listenAddr string, key crypto.PrivKey) (host.Host, error) {
+func newHost(listenAddr, dirAPIAddr string, key crypto.PrivKey) (host.Host, error) {
 	// Select connection manager
 	// connMgr, err := connmgr.NewConnManager(
 	// 	100, //nolint:mnd
@@ -25,6 +58,19 @@ func newHost(listenAddr string, key crypto.PrivKey) (host.Host, error) {
 	// }
 	// Create host
 	host, err := libp2p.New(
+		// Add directory API address to the host address factory
+		libp2p.AddrsFactory(
+			func(addrs []ma.Multiaddr) []ma.Multiaddr {
+				// Only add the dir address if dirAPIAddr is not empty
+				if dirAPIAddr != "" {
+					dirAddr := ma.StringCast("/dir/" + dirAPIAddr)
+
+					return append(addrs, dirAddr)
+				}
+
+				return addrs
+			},
+		),
 		// Use the keypair we generated
 		libp2p.Identity(key),
 		// Multiple listen addresses
