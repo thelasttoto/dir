@@ -1,28 +1,42 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-package e2e
+package network
 
 import (
-	_ "embed"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/agntcy/dir/e2e/config"
-	"github.com/agntcy/dir/e2e/utils"
+	"github.com/agntcy/dir/e2e/shared/config"
+	"github.com/agntcy/dir/e2e/shared/testdata"
+	"github.com/agntcy/dir/e2e/shared/utils"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 // Using peer addresses from utils.constants
 
+// Package-level variables for cleanup (accessible by AfterSuite)
+// CIDs are now tracked in network_suite_test.go
+
 var _ = ginkgo.Describe("Running dirctl end-to-end tests for sync commands", func() {
 	var cli *utils.CLI
 	var syncID string
 
-	recordV4Path := filepath.Join("testdata", "record_v070_sync_v4.json")
-	recordV5Path := filepath.Join("testdata", "record_v070_sync_v5.json")
+	// Setup temp files for CLI commands (CLI needs actual files on disk)
+	tempDir := os.Getenv("E2E_COMPILE_OUTPUT_DIR")
+	if tempDir == "" {
+		tempDir = os.TempDir()
+	}
+	recordV4Path := filepath.Join(tempDir, "record_v070_sync_v4_test.json")
+	recordV5Path := filepath.Join(tempDir, "record_v070_sync_v5_test.json")
+
+	// Create directory and write record data
+	_ = os.MkdirAll(filepath.Dir(recordV4Path), 0o755)
+	_ = os.WriteFile(recordV4Path, testdata.ExpectedRecordV070SyncV4JSON, 0o600)
+	_ = os.WriteFile(recordV5Path, testdata.ExpectedRecordV070SyncV5JSON, 0o600)
 
 	ginkgo.BeforeEach(func() {
 		if cfg.DeploymentMode != config.DeploymentModeNetwork {
@@ -82,6 +96,9 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests for sync commands", fun
 		ginkgo.It("should push record_v070_sync_v4.json to peer 1", func() {
 			cid = cli.Push(recordV4Path).OnServer(utils.Peer1Addr).ShouldSucceed()
 
+			// Track CID for cleanup
+			RegisterCIDForCleanup(cid, "sync")
+
 			// Validate that the returned CID correctly represents the pushed data
 			utils.LoadAndValidateCID(cid, recordV4Path)
 		})
@@ -134,7 +151,7 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests for sync commands", fun
 			output := cli.Pull(cid).OnServer(utils.Peer2Addr).ShouldSucceed()
 
 			// Compare the output with the expected JSON
-			equal, err := utils.CompareOASFRecords([]byte(output), expectedRecordV070SyncV4JSON)
+			equal, err := utils.CompareOASFRecords([]byte(output), testdata.ExpectedRecordV070SyncV4JSON)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(equal).To(gomega.BeTrue())
 		})
@@ -160,6 +177,12 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests for sync commands", fun
 			// Poll sync status until it changes from DELETE_PENDING to DELETED
 			output := cli.Sync().Status(syncID).OnServer(utils.Peer2Addr).ShouldEventuallyContain("DELETED", 120*time.Second)
 			ginkgo.GinkgoWriter.Printf("Current sync status: %s", output)
+
+			// CLEANUP: This is the last test in this Describe block
+			// Clean up sync test records to ensure isolation from subsequent test files
+			ginkgo.DeferCleanup(func() {
+				CleanupNetworkRecords(syncTestCIDs, "sync tests")
+			})
 		})
 
 		ginkgo.It("should create sync from peer 1 to peer 3 using routing search piped to sync create", func() {
@@ -182,25 +205,13 @@ var _ = ginkgo.Describe("Running dirctl end-to-end tests for sync commands", fun
 			output := cli.Pull(cidV5).OnServer(utils.Peer3Addr).ShouldSucceed()
 
 			// Compare the output with the expected JSON
-			equal, err := utils.CompareOASFRecords([]byte(output), expectedRecordV070SyncV5JSON)
+			equal, err := utils.CompareOASFRecords([]byte(output), testdata.ExpectedRecordV070SyncV5JSON)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(equal).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should fail to pull record_v070_sync_v4.json from peer 3 after sync", func() {
 			_ = cli.Pull(cid).OnServer(utils.Peer3Addr).ShouldFail()
-		})
-	})
-
-	ginkgo.Context("cleanup records that might have been synced", func() {
-		ginkgo.It("should cleanup records from peer 2", func() {
-			cidV070 := utils.CalculateCIDFromFile("testdata/record_v070.json")
-			gomega.Expect(cidV070).NotTo(gomega.BeEmpty())
-			cli.Delete(cidV070).OnServer(utils.Peer2Addr)
-
-			cidV031 := utils.CalculateCIDFromFile("testdata/record_v031.json")
-			gomega.Expect(cidV031).NotTo(gomega.BeEmpty())
-			cli.Delete(cidV031).OnServer(utils.Peer2Addr)
 		})
 	})
 })
