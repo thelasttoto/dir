@@ -2,32 +2,29 @@ module github.com/agntcy/dir/hub
 
 go 1.24.5
 
-// TODO: remove this once we refactor the hub to use the new API
-replace (
-	github.com/agntcy/dir/api => github.com/agntcy/dir/api v0.2.6
-	github.com/agntcy/dir/cli => github.com/agntcy/dir/cli v0.2.6
-	github.com/agntcy/dir/client => github.com/agntcy/dir/client v0.2.6
-)
+replace github.com/agntcy/dirhub/backport/api => github.com/agntcy/dir/api v0.2.13
 
 require (
-	github.com/agntcy/dir/api v0.2.6
-	github.com/agntcy/dir/cli v0.2.6
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.7-20250717185734-6c6e0d3c608e.1
+	github.com/agntcy/dirhub/backport/api v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/jedib0t/go-pretty/v6 v6.6.7
-	github.com/manifoldco/promptui v0.9.0
+	github.com/okta/samples-golang v0.0.0-20240104153321-dc6cf32830d4
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
+	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822
 	google.golang.org/grpc v1.73.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 )
 
 require (
-	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/go-cid v0.5.0 // indirect
@@ -49,6 +46,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
+	go.opentelemetry.io/otel v1.36.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
