@@ -1,19 +1,19 @@
 // Copyright AGNTCY Contributors (https://github.com/agntcy)
 // SPDX-License-Identifier: Apache-2.0
 
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {env} from 'node:process';
-import {writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { env } from 'node:process';
+import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 import {
   Client as GrpcClient,
   createClient,
   Transport,
 } from '@connectrpc/connect';
-import {createGrpcTransport} from '@connectrpc/connect-node';
-
+import { createGrpcTransport } from '@connectrpc/connect-node';
+import { createClient as createClientSpiffe, X509SVID } from 'spiffe';
 import * as models from '../models';
 
 /**
@@ -25,18 +25,22 @@ import * as models from '../models';
 export class Config {
   static DEFAULT_SERVER_ADDRESS = '0.0.0.0:8888';
   static DEFAULT_DIRCTL_PATH = 'dirctl';
+  static DEFAULT_SPIFFE_ENDPOINT_SOCKET = '';
   serverAddress: string;
   dirctlPath: string;
+  spiffeEndpointSocket: string;
 
   /**
    * Creates a new Config instance.
    *
    * @param serverAddress - The server address to connect to. Defaults to '0.0.0.0:8888'
    * @param dirctlPath - Path to the dirctl executable. Defaults to 'dirctl'
+   * @param spiffeEndpointSocket - Path to the spire server socket. Defaults to empty string.
    */
   constructor(
     serverAddress = Config.DEFAULT_SERVER_ADDRESS,
     dirctlPath = Config.DEFAULT_DIRCTL_PATH,
+    spiffeEndpointSocket = Config.DEFAULT_SPIFFE_ENDPOINT_SOCKET
   ) {
     // add protocol prefix if not set
     // use unsafe http unless spire is used
@@ -44,11 +48,17 @@ export class Config {
       !serverAddress.startsWith('http://') &&
       !serverAddress.startsWith('https://')
     ) {
-      serverAddress = `http://${serverAddress}`;
+      // use https protocol when spiffe used
+      if (spiffeEndpointSocket != Config.DEFAULT_SPIFFE_ENDPOINT_SOCKET) {
+        serverAddress = `https://${serverAddress}`;
+      } else {
+        serverAddress = `http://${serverAddress}`;
+      }
     }
 
     this.serverAddress = serverAddress;
     this.dirctlPath = dirctlPath;
+    this.spiffeEndpointSocket = spiffeEndpointSocket;
   }
 
   /**
@@ -67,11 +77,15 @@ export class Config {
    * ```
    */
   static loadFromEnv(prefix = 'DIRECTORY_CLIENT_') {
-    const serverAddress =
-      env[`${prefix}SERVER_ADDRESS`] || Config.DEFAULT_SERVER_ADDRESS;
+    // Load dirctl path from env without env prefix
     const dirctlPath = env['DIRCTL_PATH'] || Config.DEFAULT_DIRCTL_PATH;
 
-    return new Config(serverAddress, dirctlPath);
+    // Load other config values with env prefix
+    const serverAddress =
+      env[`${prefix}SERVER_ADDRESS`] || Config.DEFAULT_SERVER_ADDRESS;
+    const spiffeEndpointSocketPath = env[`${prefix}SPIFFE_SOCKET_PATH`] || Config.DEFAULT_SPIFFE_ENDPOINT_SOCKET;
+
+    return new Config(serverAddress, dirctlPath, spiffeEndpointSocketPath);
   }
 }
 
@@ -108,6 +122,8 @@ export class Client {
    *
    * @param config - Optional client configuration. If null, loads from environment
    *                variables using Config.loadFromEnv()
+   * @param grpcTransport - Optional transport to use for gRPC communication.
+   *                Can be created with Client.createGRPCTransport(config)
    *
    * @throws {Error} If unable to establish connection to the server or configuration is invalid
    *
@@ -118,30 +134,103 @@ export class Client {
    *
    * // Use custom config
    * const config = new Config('localhost:9999');
-   * const client = new Client(config);
+   * const grpcTransport = await Client.createGRPCTransport(config);
+   * const client = new Client(config, grpcTransport);
    * ```
    */
-  constructor(config?: Config) {
+  constructor();
+  constructor(config?: Config);
+  constructor(config?: Config, grpcTransport?: Transport);
+  constructor(config?: Config, grpcTransport?: Transport) {
     // Load config from environment if not provided
     if (!config) {
       config = Config.loadFromEnv();
     }
     this.config = config;
 
-    // Create transport settings for gRPC client
-    const transport: Transport = createGrpcTransport({
-      baseUrl: this.config.serverAddress,
-    });
+    // if no transport provided, use insecure transport
+    if (!grpcTransport) {
+      grpcTransport = createGrpcTransport({
+        baseUrl: config.serverAddress,
+      });
+    }
 
     // Set clients for all services
-    this.storeClient = createClient(models.store_v1.StoreService, transport);
+    this.storeClient = createClient(models.store_v1.StoreService, grpcTransport);
     this.routingClient = createClient(
       models.routing_v1.RoutingService,
-      transport,
+      grpcTransport,
     );
-    this.searchClient = createClient(models.search_v1.SearchService, transport);
-    this.signClient = createClient(models.sign_v1.SignService, transport);
-    this.syncClient = createClient(models.store_v1.SyncService, transport);
+    this.searchClient = createClient(models.search_v1.SearchService, grpcTransport);
+    this.signClient = createClient(models.sign_v1.SignService, grpcTransport);
+    this.syncClient = createClient(models.store_v1.SyncService, grpcTransport);
+  }
+
+  private static convertToPEM(bytes: Uint8Array, label: string): string {
+    // Convert Uint8Array to base64 string
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64String = btoa(binary);
+
+    // Split base64 string into 64-character lines
+    const lines = base64String.match(/.{1,64}/g) || [];
+
+    // Build PEM formatted string with headers and footers
+    const pem = [
+      `-----BEGIN ${label}-----`,
+      ...lines,
+      `-----END ${label}-----`
+    ].join('\n');
+
+    return pem;
+  }
+
+  static async createGRPCTransport(config: Config): Promise<Transport> {
+    // If no spiffe socket provided, use insecure transport
+    if (config.spiffeEndpointSocket === '') {
+      const transport: Transport = createGrpcTransport({
+        baseUrl: config.serverAddress,
+      });
+
+      return transport;
+    }
+
+    // Otherwise, create secure transport with spiffe
+    const client = createClientSpiffe(config.spiffeEndpointSocket);
+
+    let svid: X509SVID = {
+      spiffeId: '',
+      hint: '',
+      x509Svid: new Uint8Array(),
+      x509SvidKey: new Uint8Array(),
+      bundle: new Uint8Array(),
+    };
+
+    const svidStream = client.fetchX509SVID({});
+    for await (const message of svidStream.responses) {
+      message.svids.forEach((_svid) => {
+        svid = _svid;
+      })
+
+      if (message.svids.length > 0) {
+        break
+      }
+    }
+
+    // Create transport settings for gRPC client
+    const transport = createGrpcTransport({
+      baseUrl: config.serverAddress,
+      nodeOptions: {
+        ca: this.convertToPEM(svid.bundle, "TRUSTED CERTIFICATE"),
+        cert: this.convertToPEM(svid.x509Svid, "CERTIFICATE"),
+        key: this.convertToPEM(svid.x509SvidKey, "PRIVATE KEY"),
+      },
+    });
+
+    return transport;
   }
 
   /**
@@ -666,9 +755,9 @@ export class Client {
     shell_env['COSIGN_PASSWORD'] = String(req.password);
 
     // Execute command
-    execSync(
-      `${this.config.dirctlPath} sign "${cid}" --key "${tmp_key_filename}"`,
-      {env: {...shell_env}, encoding: 'utf8', stdio: 'pipe'},
+    spawnSync(
+      `${this.config.dirctlPath}`, ["sign", cid, "--key", tmp_key_filename],
+      { env: { ...shell_env }, encoding: 'utf8', stdio: 'pipe' },
     );
   }
 
@@ -693,32 +782,32 @@ export class Client {
     oidc_client_id: string,
   ): void {
     // Prepare command
-    let command = `${this.config.dirctlPath} sign "${cid}"`;
+    let commandArgs = ["sign", cid];
     if (req.idToken !== '') {
-      command = `${command} --oidc-token "${req.idToken}"`;
+      commandArgs.push(...["--oidc-token", req.idToken]);
     }
     if (
       req.options?.oidcProviderUrl !== undefined &&
       req.options.oidcProviderUrl !== ''
     ) {
-      command = `${command} --oidc-provider-url "${req.options.oidcProviderUrl}"`;
+      commandArgs.push(...["--oidc-provider-url", req.options.oidcProviderUrl]);
     }
     if (req.options?.fulcioUrl !== undefined && req.options.fulcioUrl !== '') {
-      command = `${command} --fulcio-url "${req.options.fulcioUrl}"`;
+      commandArgs.push(...["--fulcio-url", req.options.fulcioUrl]);
     }
     if (req.options?.rekorUrl !== undefined && req.options.rekorUrl !== '') {
-      command = `${command} --rekor-url "${req.options.rekorUrl}"`;
+      commandArgs.push(...["--rekor-url", req.options.rekorUrl]);
     }
     if (
       req.options?.timestampUrl !== undefined &&
       req.options.timestampUrl !== ''
     ) {
-      command = `${command} --timestamp-url "${req.options.timestampUrl}"`;
+      commandArgs.push(...["--timestamp-url", req.options.timestampUrl]);
     }
 
     // Execute command
-    execSync(`${command} --oidc-client-id "${oidc_client_id}"`, {
-      env: {...env},
+    spawnSync(`${this.config.dirctlPath}`, commandArgs, {
+      env: { ...env },
       encoding: 'utf8',
       stdio: 'pipe',
     });

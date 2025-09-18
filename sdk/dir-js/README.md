@@ -70,6 +70,11 @@ const config = new Config(
     dirctlPath="/usr/local/bin/dirctl"
 );
 const client = new Client(config);
+
+// Use SPIRE for mTLS communication
+const config = new Config(spiffeEndpointSocket="/tmp/agent.sock");
+const transport = await Client.createGRPCTransport(config);
+const spiffeClient = new Client(config, transport);
 ```
 
 ## Getting Started
