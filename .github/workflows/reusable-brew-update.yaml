@@ -9,6 +9,15 @@ description: |
 
 on:
   workflow_call:
+    inputs:
+      create-pr:
+        type: boolean
+        default: true
+        description: Enable to create PR
+      run-without-diff:
+        type: boolean
+        default: false
+        description: Run even if there are no changes.
   workflow_dispatch:
     inputs:
       create-pr:
@@ -19,18 +28,18 @@ on:
         type: boolean
         default: false
         description: Run even if there are no changes.
-  release:
-    types: [released]
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  brew-formula-update:
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  formula-update:
+    name: Update Formula
     runs-on: ubuntu-latest
+    env:
+      # Required for `gh` CLI authentication
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

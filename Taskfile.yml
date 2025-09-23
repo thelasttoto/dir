@@ -1202,7 +1202,7 @@ tasks:
     deps:
       - task: deps:protoc
       - task: deps:bufbuild
-    dir: ./api
+    dir: ./proto
     cmds:
       - '{{.BUFBUILD_BIN}} lint'
 

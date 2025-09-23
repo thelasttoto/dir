@@ -1,7 +1,7 @@
 # Copyright AGNTCY Contributors (https://github.com/agntcy)
 # SPDX-License-Identifier: Apache-2.0
 
-name: Demo - Dir
+name: Demo - DIR
 
 description: |
   This workflow demonstrates how to use the Dir CLI with a Kind cluster and Helm chart.
@@ -22,8 +22,8 @@ on:
         default: false
 
 permissions:
-  id-token: write   # Required for OIDC token generation
-  contents: read    # Required for repository access
+  id-token: write
+  contents: read
 
 jobs:
   demo:

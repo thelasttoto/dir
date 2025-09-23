@@ -1,3 +1,6 @@
+# Copyright AGNTCY Contributors (https://github.com/agntcy)
+# SPDX-License-Identifier: Apache-2.0
+
 name: Project
 
 on:
@@ -10,10 +13,11 @@ permissions:
   pull-requests: write
 
 jobs:
-  sync-stale:
+  sync-items:
+    name: Sync items
     runs-on: ubuntu-latest
     steps:
-      - name: Sync stale work items
+      - name: Sync stale items
         uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -45,14 +49,16 @@ jobs:
             re-open this PR or file a new one. Thank you!
 
   sync-labels:
-    name: Sync work labels
+    name: Sync labels
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Checkout labels
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: .github/labels.yml
 
-      - uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+      - name: Sync labels
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
         with:
           dry-run: false
           token: ${{ secrets.GITHUB_TOKEN }}

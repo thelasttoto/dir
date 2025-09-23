@@ -1,7 +1,7 @@
 # Copyright AGNTCY Contributors (https://github.com/agntcy)
 # SPDX-License-Identifier: Apache-2.0
 
-name: Validate PR
+name: PR
 
 on:
   pull_request_target:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate PR
+    name: Validate
     runs-on: ubuntu-latest
     steps:
       - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
@@ -85,7 +85,8 @@ jobs:
           message: |
             Hey there and thank you for opening this pull request! 👋🏼
             
-            We require pull request titles to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/) and it looks like your proposed title needs to be adjusted.
+            We require pull request titles to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/),
+            and it looks like your proposed title needs to be adjusted.
 
             Details:
             
@@ -98,8 +99,7 @@ jobs:
             ```
             - feat(dir/api): add new authentication endpoint
             - fix(sdk/js): resolve issue with token refresh
-            - chore(sdk/js): update dependencies
-            - chore(custom-area): changes to .gitignore file
+            - chore(deps): update dependencies
             ```
 
       # Hide error message if the PR title has been fixed
@@ -110,7 +110,7 @@ jobs:
           delete: true
 
   label:
-    name: Label PR Size
+    name: Label
     runs-on: ubuntu-latest
     steps:
       - uses: codelytv/pr-size-labeler@1c3422395d899286d5ee2c809fd5aed264d5eb9b # v1.10.2

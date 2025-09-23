@@ -6,6 +6,23 @@ lint:
   disallow_comment_ignores: true
   use:
     - STANDARD
+  ignore_only:
+    ENUM_ZERO_VALUE_SUFFIX:
+      - agntcy/dir/routing/v1/peer.proto
+    RPC_REQUEST_STANDARD_NAME:
+      - agntcy/dir/routing/v1/publication_service.proto
+      - agntcy/dir/routing/v1/routing_service.proto
+      - agntcy/dir/store/v1/store_service.proto
+    RPC_RESPONSE_STANDARD_NAME:
+      - agntcy/dir/routing/v1/publication_service.proto
+      - agntcy/dir/routing/v1/routing_service.proto
+      - agntcy/dir/store/v1/store_service.proto
+      - agntcy/dir/store/v1/sync_service.proto
+    RPC_REQUEST_RESPONSE_UNIQUE:
+      - agntcy/dir/routing/v1/publication_service.proto
+      - agntcy/dir/routing/v1/routing_service.proto
+      - agntcy/dir/store/v1/store_service.proto
+  enum_zero_value_suffix: _UNSPECIFIED
 breaking:
   use:
     - WIRE_JSON
