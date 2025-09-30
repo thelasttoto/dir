@@ -132,7 +132,7 @@ func TestExtractManifestAnnotations(t *testing.T) {
 				// NOTE: V1 skills use "categoryName/className" format, unlike V2/V3 which use simple names
 				ManifestKeySkills:                   "nlp/processing,ml/inference",
 				ManifestKeyLocatorTypes:             "docker,helm",
-				ManifestKeyExtensionNames:           "security,monitoring",
+				ManifestKeyModuleNames:              "security,monitoring",
 				ManifestKeyCustomPrefix + "custom1": "value1",
 				ManifestKeyCustomPrefix + "custom2": "value2",
 			},
@@ -206,7 +206,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 			name:        "Nil annotations",
 			annotations: nil,
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations:   make(map[string]string),
 			},
 		},
@@ -214,7 +214,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 			name:        "Empty annotations",
 			annotations: map[string]string{},
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations:   make(map[string]string),
 			},
 		},
@@ -247,7 +247,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 				ManifestKeyAuthors: "author1,author2",
 			},
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations: map[string]string{
 					MetadataKeyName:         "skill-agent",
 					MetadataKeySkills:       "nlp,ml,vision",
@@ -266,7 +266,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 				ManifestKeySignedAt:      "2023-01-01T12:00:00Z",
 			},
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations: map[string]string{
 					MetadataKeyName:          "secure-agent",
 					MetadataKeySigned:        "true",
@@ -283,7 +283,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 				ManifestKeyCustomPrefix + "custom2": "value2",
 			},
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations: map[string]string{
 					MetadataKeyName: "custom-agent",
 					"custom1":       "value1",
@@ -294,22 +294,22 @@ func TestParseManifestAnnotations(t *testing.T) {
 		{
 			name: "Record with all metadata types",
 			annotations: map[string]string{
-				ManifestKeyName:           "full-agent",
-				ManifestKeySkills:         "nlp,ml",
-				ManifestKeyLocatorTypes:   "docker,helm,k8s",
-				ManifestKeyExtensionNames: "security,monitoring",
-				ManifestKeyPreviousCid:    "QmPrevious123",
+				ManifestKeyName:         "full-agent",
+				ManifestKeySkills:       "nlp,ml",
+				ManifestKeyLocatorTypes: "docker,helm,k8s",
+				ManifestKeyModuleNames:  "security,monitoring",
+				ManifestKeyPreviousCid:  "QmPrevious123",
 			},
 			expected: &corev1.RecordMeta{
-				SchemaVersion: "v0.3.1", // fallback
+				SchemaVersion: FallbackSchemaVersion,
 				Annotations: map[string]string{
 					MetadataKeyName:              "full-agent",
 					MetadataKeySkills:            "nlp,ml",
 					MetadataKeySkillsCount:       "2",
 					MetadataKeyLocatorTypes:      "docker,helm,k8s",
 					MetadataKeyLocatorTypesCount: "3",
-					MetadataKeyExtensionNames:    "security,monitoring",
-					MetadataKeyExtensionCount:    "2",
+					MetadataKeyModuleNames:       "security,monitoring",
+					MetadataKeyModuleCount:       "2",
 					MetadataKeyPreviousCid:       "QmPrevious123",
 				},
 			},
@@ -336,7 +336,7 @@ func TestParseManifestAnnotations(t *testing.T) {
 						key == MetadataKeySkillsCount ||
 							key == MetadataKeyAuthorsCount ||
 							key == MetadataKeyLocatorTypesCount ||
-							key == MetadataKeyExtensionCount,
+							key == MetadataKeyModuleCount,
 						"Unexpected annotation key: %s", key)
 				}
 			}
