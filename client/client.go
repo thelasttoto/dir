@@ -56,6 +56,7 @@ func New(opts ...Option) (*Client, error) {
 }
 
 func (c *Client) Close() error {
+	// Close auth client if it exists
 	if c.authClient != nil {
 		//nolint:wrapcheck
 		return c.authClient.Close()

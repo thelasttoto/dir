@@ -5,25 +5,25 @@ package config
 
 import "errors"
 
-// Config contains configuration for AuthZ services.
+// Config contains configuration for authorization (AuthZ) services.
+// Authorization is separate from authentication (AuthN) - it receives
+// an authenticated SPIFFE ID from the context and makes policy decisions.
 type Config struct {
-	// Indicates if the services are enabled
+	// Indicates if authorization is enabled
 	Enabled bool `json:"enabled,omitempty" mapstructure:"enabled"`
 
-	// Spiffe socket path
-	SocketPath string `json:"socket_path,omitempty" mapstructure:"socket_path"`
-
-	// Spiffe trust domain
+	// Trust domain for this Directory server
+	// Used to distinguish internal vs external requests
 	TrustDomain string `json:"trust_domain,omitempty" mapstructure:"trust_domain"`
 }
 
 func (c *Config) Validate() error {
-	if c.SocketPath == "" {
-		return errors.New("socket path is required")
+	if !c.Enabled {
+		return nil
 	}
 
 	if c.TrustDomain == "" {
-		return errors.New("trust domain is required")
+		return errors.New("trust domain is required for authorization")
 	}
 
 	return nil
