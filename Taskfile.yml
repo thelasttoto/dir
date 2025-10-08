@@ -40,7 +40,7 @@ vars:
   GOLANGCI_LINT_BIN: '{{ .BIN_DIR }}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
   LICENSEI_VERSION: '0.9.0'
   LICENSEI_BIN: '{{ .BIN_DIR }}/licensei-{{.LICENSEI_VERSION}}'
-  UV_VERSION: '0.6.1'
+  UV_VERSION: '0.8.23'
   UV_BIN: '{{ .BIN_DIR }}/uv-{{.UV_VERSION}}'
   UV_PUBLISH_TOKEN: '{{ .UV_PUBLISH_TOKEN | default "" }}'
   COSIGN_VERSION: '2.5.3'
@@ -217,6 +217,7 @@ tasks:
       - task: deps:cosign
       - task: cli:compile
       - task: sdk:deps:javascript
+      - task: sdk:deps:python
 
   sdk:deps:cicd:iodc-token-generation:
     desc: Get Fulcio OIDC token for CICD
@@ -270,8 +271,10 @@ tasks:
 
   sdk:test-env:spiffe:load-test-image:
     desc: Load the SDK tests into KinD
+    vars:
+      GOARCH: '{{ .GOARCH | default ARCH }}'
     cmds:
-      - '{{.BAKE_ENV}} docker buildx bake sdks-test {{.IMAGE_BAKE_OPTS}}'
+      - '{{.BAKE_ENV}} docker buildx bake sdks-test --set *.platform=linux/{{.GOARCH}} {{.IMAGE_BAKE_OPTS}}'
       - '{{.KUBECTL_BIN}} config use-context kind-dir.example'
       - '{{.KIND_BIN}} load docker-image ghcr.io/agntcy/sdks-test:{{.IMAGE_TAG}} --name dir.example'
 
@@ -311,7 +314,7 @@ tasks:
     desc: Test python client SDK package
     dir: ./sdk/dir-py
     deps:
-      - task: deps:uv
+      - task: sdk:deps:python
     env:
       KIND_CLUSTER_NAME: 'sdk-py-test'
     cmds:
@@ -338,6 +341,14 @@ tasks:
         export COSIGN_PATH="$(printf "%s" "${COSIGN_PATH:-{{ .COSIGN_BIN }}}")"
 
         npm run test
+
+  sdk:deps:python:
+    desc: Install deps for python SDK package
+    dir: ./sdk/dir-py
+    deps:
+      - task: deps:uv
+    cmds:
+      - '{{.UV_BIN}} sync --all-packages'
 
   sdk:deps:javascript:
     desc: Install deps for javascript SDK package
@@ -558,16 +569,37 @@ tasks:
       HELM_CHART_PATH: '{{ .ROOT_DIR }}/install/charts/dir'
       HELM_VALUES_PATH: '{{ .ROOT_DIR }}/install/charts/dir/values.yaml'
       HELM_EXTRA_ARGS: '{{ .HELM_EXTRA_ARGS | default "" }}'
+
+      # Generate credentials
+      HTPASSWD_USERNAME: 'apiserver'
+      HTPASSWD_PASSWORD:
+        sh: openssl rand -hex 16
+      HTPASSWD_AUTH_HEADER:
+        sh: echo -n "apiserver:{{ .HTPASSWD_PASSWORD }}" | base64
+      HTPASSWD_SYNC_USERNAME: 'sync-user'
+      HTPASSWD_SYNC_PASSWORD:
+        sh: openssl rand -hex 16
     cmds:
       - task: deploy:zot:config
         vars:
           ZOT_CONFIG_DIR: /opt/zot-config
+          HTPASSWD_USERNAME: '{{ .HTPASSWD_USERNAME }}'
+          HTPASSWD_PASSWORD: '{{ .HTPASSWD_PASSWORD }}'
+          HTPASSWD_AUTH_HEADER: '{{ .HTPASSWD_AUTH_HEADER }}'
+          HTPASSWD_SYNC_USERNAME: '{{ .HTPASSWD_SYNC_USERNAME }}'
+          HTPASSWD_SYNC_PASSWORD: '{{ .HTPASSWD_SYNC_PASSWORD }}'
       - |
         {{ .HELM_BIN }} upgrade --install dir \
           {{ .HELM_CHART_PATH }} \
           -f {{ .HELM_VALUES_PATH }} \
           --set apiserver.image.tag="{{ .IMAGE_TAG }}" \
           {{ if .DIRECTORY_SERVER_PUBLICATION_SCHEDULER_INTERVAL }}--set apiserver.config.publication.scheduler_interval="{{ .DIRECTORY_SERVER_PUBLICATION_SCHEDULER_INTERVAL }}"{{ end }} \
+          --set apiserver.config.store.oci.auth_config.username="{{ .HTPASSWD_USERNAME }}" \
+          --set apiserver.config.store.oci.auth_config.password="{{ .HTPASSWD_PASSWORD }}" \
+          --set apiserver.zot.authHeader="{{ .HTPASSWD_AUTH_HEADER }}" \
+          --set apiserver.config.sync.auth_config.username="{{ .HTPASSWD_SYNC_USERNAME }}" \
+          --set apiserver.config.sync.auth_config.password="{{ .HTPASSWD_SYNC_PASSWORD }}" \
+          --set apiserver.log_level="DEBUG" \
           {{ .HELM_EXTRA_ARGS }} \
           --namespace {{ .HELM_NAMESPACE }} \
           --create-namespace \
@@ -873,7 +905,7 @@ tasks:
             }
           },
           "log": {
-            "level": "info"
+            "level": "debug"
           },
           "extensions": {
             "search": {
@@ -1077,6 +1109,8 @@ tasks:
   # TODO: change to Ingress services instead of LoadBalancer
   test:spire:
     desc: Test SPIRE federation setup between DIR and DIRCTL clusters
+    deps:
+      - task: helm:gen
     vars:
       DIR_TRUST_DOMAIN: '{{ .DIR_TRUST_DOMAIN | default "dir.example" }}'
       DIRCTL_TRUST_DOMAIN: '{{ .DIRCTL_TRUST_DOMAIN | default "dirctl.example" }}'
@@ -1141,6 +1175,11 @@ tasks:
         apiserver:
           service:
             type: LoadBalancer
+          config:
+            authn:
+              enabled: true
+            authz:
+              enabled: true
           spire:
             enabled: true
             trustDomain: {{ .DIR_TRUST_DOMAIN }}
@@ -1162,6 +1201,7 @@ tasks:
         vars:
           KIND_CLUSTER_NAME: '{{ .DIR_TRUST_DOMAIN }}'
           HELM_EXTRA_ARGS: '-f /tmp/server-federation.yaml'
+          DIRECTORY_SERVER_PUBLICATION_SCHEDULER_INTERVAL: 1s
 
       # Get DIR API server address
       - task: deploy:kubernetes:context
