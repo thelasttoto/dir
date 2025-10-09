@@ -26,6 +26,7 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/providers"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc/codes"
@@ -464,16 +465,53 @@ func (r *routeRemote) createPeerInfo(ctx context.Context, peerID string) *routin
 }
 
 func (r *routeRemote) getDirectoryAPIAddress(ctx context.Context, peerID string) string {
-	key := datastore.NewKey("peer_addrs/" + peerID)
+	// Try datastore cache first (fast path)
+	if dirAddr := r.getDirectoryAPIAddressFromDatastore(ctx, peerID); dirAddr != "" {
+		return dirAddr
+	}
 
-	addresses, err := r.dstore.Get(ctx, key)
+	// Fallback: Try live peerstore (handles mDNS and DHT without addresses)
+	pid, err := peer.Decode(peerID)
 	if err != nil {
-		remoteLogger.Error("Failed to get peer addresses", "error", err)
+		remoteLogger.Error("Failed to decode peer ID", "peerID", peerID, "error", err)
 
 		return ""
 	}
 
-	// Unmarshal the addresses
+	peerstoreAddrs := r.server.Host().Peerstore().Addrs(pid)
+	if len(peerstoreAddrs) == 0 {
+		remoteLogger.Warn("No Directory API address found for peer",
+			"peerID", peerID,
+			"note", "Peer might be discovered via mDNS or DHT without /dir/ configuration")
+
+		return ""
+	}
+
+	remoteLogger.Debug("Trying peerstore addresses for /dir/ protocol",
+		"peerID", peerID,
+		"addrs", len(peerstoreAddrs))
+
+	if dirAddr := extractDirProtocol(peerstoreAddrs, peerID); dirAddr != "" {
+		return dirAddr
+	}
+
+	remoteLogger.Warn("No /dir/ protocol found in peerstore addresses",
+		"peerID", peerID)
+
+	return ""
+}
+
+// getDirectoryAPIAddressFromDatastore checks datastore cache for peer addresses.
+func (r *routeRemote) getDirectoryAPIAddressFromDatastore(ctx context.Context, peerID string) string {
+	key := datastore.NewKey("peer_addrs/" + peerID)
+
+	addresses, err := r.dstore.Get(ctx, key)
+	if err != nil {
+		remoteLogger.Debug("No cached peer addresses in datastore", "peerID", peerID)
+
+		return ""
+	}
+
 	var multiaddrs []ma.Multiaddr
 	if err := json.Unmarshal(addresses, &multiaddrs); err != nil {
 		remoteLogger.Error("Failed to unmarshal peer addresses", "error", err)
@@ -481,16 +519,71 @@ func (r *routeRemote) getDirectoryAPIAddress(ctx context.Context, peerID string)
 		return ""
 	}
 
-	remoteLogger.Debug("Unmarshalled peer addresses", "peerID", peerID, "multiaddrs", multiaddrs)
+	return extractDirProtocol(multiaddrs, peerID)
+}
 
+// storePeerAddresses stores peer addresses in datastore for later retrieval.
+// Tries DHT notification addresses first, falls back to peerstore if empty.
+func (r *routeRemote) storePeerAddresses(ctx context.Context, peerIDStr string, peerID peer.ID, notifAddrs []ma.Multiaddr, cid string) {
+	// Try DHT notification addresses first
+	peerAddrs := notifAddrs
+	if len(peerAddrs) == 0 {
+		// Fallback: get addresses from libp2p peerstore
+		peerAddrs = r.server.Host().Peerstore().Addrs(peerID)
+		remoteLogger.Debug("DHT notification had no addresses, using peerstore",
+			"peerID", peerIDStr,
+			"peerstoreAddrs", len(peerAddrs))
+	}
+
+	if len(peerAddrs) == 0 {
+		remoteLogger.Warn("No peer addresses available from DHT or peerstore",
+			"peerID", peerIDStr,
+			"cid", cid)
+
+		return
+	}
+
+	// Check if already stored
+	key := datastore.NewKey("peer_addrs/" + peerIDStr)
+	if _, err := r.dstore.Get(ctx, key); err == nil {
+		return // Already have addresses
+	}
+
+	// Marshal and store
+	addresses, err := json.Marshal(peerAddrs)
+	if err != nil {
+		remoteLogger.Error("Failed to marshal peer addresses", "error", err)
+
+		return
+	}
+
+	if err := r.dstore.Put(ctx, key, addresses); err != nil {
+		remoteLogger.Error("Failed to store peer addresses", "error", err)
+
+		return
+	}
+
+	remoteLogger.Debug("Stored peer addresses", "peerID", peerIDStr, "count", len(peerAddrs))
+}
+
+// extractDirProtocol extracts the /dir/ protocol value from a list of multiaddrs.
+// Returns empty string if no /dir/ protocol is found.
+func extractDirProtocol(multiaddrs []ma.Multiaddr, peerID string) string {
 	for _, addr := range multiaddrs {
 		protocols := addr.Protocols()
 		for _, protocol := range protocols {
-			if protocol.Code == p2p.DirProtocolCode { // dir protocol
+			if protocol.Code == p2p.DirProtocolCode {
 				value, err := addr.ValueForProtocol(p2p.DirProtocolCode)
 				if err != nil {
-					remoteLogger.Error("Failed to get dir protocol value", "peerID", peerID, "addr", addr.String(), "error", err)
+					remoteLogger.Debug("Failed to extract /dir/ protocol value",
+						"peerID", peerID,
+						"addr", addr.String(),
+						"error", err)
 				} else {
+					remoteLogger.Debug("Found Directory API address",
+						"peerID", peerID,
+						"dirAddress", value)
+
 					return value
 				}
 			}
@@ -588,24 +681,8 @@ func (r *routeRemote) handleCIDProviderNotification(ctx context.Context, notif *
 		return
 	}
 
-	// Add the peer's addresses to our peerstore so we can contact them later
-	//nolint:nestif
-	if len(notif.Peer.Addrs) > 0 {
-		key := datastore.NewKey("peer_addrs/" + peerIDStr)
-		if _, err := r.dstore.Get(ctx, key); err != nil {
-			addresses, err := json.Marshal(notif.Peer.Addrs)
-			if err != nil {
-				remoteLogger.Error("Failed to marshal peer addresses", "error", err)
-			}
-
-			err = r.dstore.Put(ctx, key, addresses)
-			if err != nil {
-				remoteLogger.Error("Failed to store peer addresses", "error", err)
-			}
-
-			remoteLogger.Debug("Stored peer addresses", "peerID", peerIDStr, "addresses", addresses)
-		}
-	}
+	// Store peer addresses for later use
+	r.storePeerAddresses(ctx, peerIDStr, notif.Peer.ID, notif.Peer.Addrs, notif.Ref.GetCid())
 
 	// Check if we already have labels cached (from GossipSub announcement)
 	if r.hasRemoteRecordCached(ctx, notif.Ref.GetCid(), peerIDStr) {
